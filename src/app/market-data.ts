@@ -120,6 +120,7 @@ export type MarketApiResponse = {
 };
 
 export const marketItems: Omit<MarketItem, 'value' | 'change' | 'percent' | 'positive' | 'source' | 'updatedAt'>[] = [
+  { symbol: '^DJI', name: '\u9053\u743c\u65af\u5de5\u4e1a\u5e73\u5747\u6307\u6570', category: '\u6307\u6570 \u00b7 \u7f8e\u56fd', spark: 'M2 35 C13 30 23 33 35 23 S48 26 60 17 S74 21 86 13 S103 16 120 5' },
   { symbol: '^GSPC', name: '标普 500', category: '指数 · 美国', spark: 'M2 42 C16 36 20 38 30 32 S46 38 58 27 S76 31 88 18 S106 24 120 10' },
   { symbol: '^IXIC', name: '纳斯达克', category: '指数 · 美国', spark: 'M2 37 C14 40 24 26 34 31 S48 23 58 28 S72 11 84 19 S104 14 120 5' },
   { symbol: 'GC=F', name: '黄金', category: '大宗商品 · 期货', spark: 'M2 12 C16 19 23 15 34 25 S48 20 58 31 S77 27 89 38 S106 34 120 43' },

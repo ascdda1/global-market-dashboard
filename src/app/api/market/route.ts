@@ -69,6 +69,7 @@ type BeaResponse = {
 };
 
 const fallbackQuotes: Record<string, Quote> = {
+  '^DJI': { symbol: '^DJI', value: 38627.99, change: 184.12, percent: 0.48, updatedAt: 0, source: '\u6a21\u62df\u6570\u636e' },
   '^GSPC': { symbol: '^GSPC', value: 5432.26, change: 32.41, percent: 0.6, updatedAt: 0, source: '模拟数据' },
   '^IXIC': { symbol: '^IXIC', value: 17608.44, change: 141.85, percent: 0.81, updatedAt: 0, source: '模拟数据' },
   'GC=F': { symbol: 'GC=F', value: 2342.8, change: -8.4, percent: -0.36, updatedAt: 0, source: '模拟数据' },
@@ -79,18 +80,29 @@ const fallbackQuotes: Record<string, Quote> = {
   AAPL: { symbol: 'AAPL', value: 207.15, change: 0.92, percent: 0.45, updatedAt: 0, source: '模拟数据' },
 };
 
-const yahooSymbols = ['^GSPC', '^IXIC', 'GC=F', 'CL=F'];
+const yahooSymbols = ['^GSPC', '^IXIC', '^DJI', 'GC=F', 'CL=F'];
 const defaultFinnhubSymbols = ['NVDA', 'MU', 'TSLA', 'AAPL'];
 const maxFinnhubSymbols = 30;
 const symbolPattern = /^[A-Z][A-Z0-9.-]{0,9}$/;
 const treasurySymbols = ['US2Y', 'US10Y', 'US30Y'] as const;
 const treasuryFields: Record<typeof treasurySymbols[number], string> = { US2Y: 'BC_2YEAR', US10Y: 'BC_10YEAR', US30Y: 'BC_30YEAR' };
 const cryptoSymbols = ['bitcoin', 'ethereum'] as const;
-const historyCache = new Map<string, { expiresAt: number; values: number[] }>();
+type ServerCacheEntry<T> = { expiresAt: number; values: T };
+
+const quoteCache = new Map<string, ServerCacheEntry<Quote>>();
+const treasuryCache = new Map<string, ServerCacheEntry<Record<string, TreasuryQuote>>>();
+const cryptoCache = new Map<string, ServerCacheEntry<Record<string, Quote>>>();
+const historyCache = new Map<string, ServerCacheEntry<number[]>>();
 const historyCacheTtlMs = 60_000;
 const maxHistoryPoints = 72;
-const macroCache = new Map<string, { expiresAt: number; values: Record<string, MacroQuote> }>();
-const macroCacheTtlMs = 15 * 60_000;
+const marketQuoteCacheTtlMs = 45_000;
+const treasuryCacheTtlMs = 10 * 60_000;
+const cryptoCacheTtlMs = 45_000;
+const macroCache = new Map<string, ServerCacheEntry<Record<string, MacroQuote>>>();
+const macroCacheTtlMs = 45 * 60_000;
+const marketRequestTimeoutMs = 4_000;
+const officialDataTimeoutMs = 7_000;
+const historyRequestTimeoutMs = 5_000;
 
 const fallbackMacro: Record<string, MacroQuote> = {
   cpi: { value: 320.25, change: 0.3, referencePeriod: '模拟数据', source: '模拟数据', updatedAt: 0, unit: 'index' },
@@ -124,56 +136,87 @@ const fallbackCryptoQuotes: Record<string, Quote> = {
   ethereum: { symbol: 'ETH', value: 3200, change: -18, percent: -0.56, updatedAt: 0, source: '模拟数据' },
 };
 
-async function fetchYahooQuote(symbol: string): Promise<Quote> {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1m`;
-  const response = await fetch(url, {
-    cache: 'no-store',
-    headers: { 'User-Agent': 'Mozilla/5.0 (personal-market-dashboard)' },
-  });
-  if (!response.ok) throw new Error(`Yahoo Finance responded with ${response.status}`);
-
-  const data = (await response.json()) as YahooChartResponse;
-  const meta = data.chart?.result?.[0]?.meta;
-  const value = meta?.regularMarketPrice;
-  const previous = meta?.chartPreviousClose ?? meta?.previousClose;
-  if (typeof value !== 'number' || typeof previous !== 'number' || previous === 0) {
-    throw new Error('Yahoo Finance returned incomplete quote data');
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error(`Request timed out after ${timeoutMs}ms`);
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
+}
 
-  return {
-    symbol,
-    value,
-    change: value - previous,
-    percent: ((value - previous) / previous) * 100,
-    updatedAt: (meta?.regularMarketTime ?? Math.floor(Date.now() / 1000)) * 1000,
-    source: 'Yahoo Finance',
-  };
+async function withServerCache<T>(cache: Map<string, ServerCacheEntry<T>>, key: string, ttlMs: number, fetcher: () => Promise<T>) {
+  const cached = cache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.values;
+  try {
+    const values = await fetcher();
+    cache.set(key, { values, expiresAt: Date.now() + ttlMs });
+    return values;
+  } catch (error) {
+    if (cached) return cached.values;
+    throw error;
+  }
+}
+
+async function fetchYahooQuote(symbol: string): Promise<Quote> {
+  return withServerCache(quoteCache, `yahoo:${symbol}`, marketQuoteCacheTtlMs, async () => {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1m`;
+    const response = await fetchWithTimeout(url, {
+      cache: 'no-store',
+      headers: { 'User-Agent': 'Mozilla/5.0 (personal-market-dashboard)' },
+    }, marketRequestTimeoutMs);
+    if (!response.ok) throw new Error(`Yahoo Finance responded with ${response.status}`);
+
+    const data = (await response.json()) as YahooChartResponse;
+    const meta = data.chart?.result?.[0]?.meta;
+    const value = meta?.regularMarketPrice;
+    const previous = meta?.chartPreviousClose ?? meta?.previousClose;
+    if (typeof value !== 'number' || typeof previous !== 'number' || previous === 0) {
+      throw new Error('Yahoo Finance returned incomplete quote data');
+    }
+
+    return {
+      symbol,
+      value,
+      change: value - previous,
+      percent: ((value - previous) / previous) * 100,
+      updatedAt: (meta?.regularMarketTime ?? Math.floor(Date.now() / 1000)) * 1000,
+      source: 'Yahoo Finance',
+    };
+  });
 }
 
 async function fetchFinnhubQuote(symbol: string, apiKey: string): Promise<Quote> {
-  const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${encodeURIComponent(apiKey)}`;
-  const response = await fetch(url, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`Finnhub responded with ${response.status}`);
+  return withServerCache(quoteCache, `finnhub:${symbol}`, marketQuoteCacheTtlMs, async () => {
+    const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${encodeURIComponent(apiKey)}`;
+    const response = await fetchWithTimeout(url, { cache: 'no-store' }, marketRequestTimeoutMs);
+    if (!response.ok) throw new Error(`Finnhub responded with ${response.status}`);
 
-  const data = (await response.json()) as FinnhubResponse;
-  if (typeof data.c !== 'number' || typeof data.d !== 'number' || typeof data.dp !== 'number' || data.c === 0) {
-    throw new Error('Finnhub returned incomplete quote data');
-  }
+    const data = (await response.json()) as FinnhubResponse;
+    if (typeof data.c !== 'number' || typeof data.d !== 'number' || typeof data.dp !== 'number' || data.c === 0) {
+      throw new Error('Finnhub returned incomplete quote data');
+    }
 
-  return {
-    symbol,
-    value: data.c,
-    change: data.d,
-    percent: data.dp,
-    updatedAt: (data.t ?? Math.floor(Date.now() / 1000)) * 1000,
-    source: 'Finnhub',
-  };
+    return {
+      symbol,
+      value: data.c,
+      change: data.d,
+      percent: data.dp,
+      updatedAt: (data.t ?? Math.floor(Date.now() / 1000)) * 1000,
+      source: 'Finnhub',
+    };
+  });
 }
 
 async function fetchTreasuryQuotes(): Promise<Record<string, TreasuryQuote>> {
+  return withServerCache(treasuryCache, 'treasury:daily-yield-curve', treasuryCacheTtlMs, async () => {
   const year = new Date().getUTCFullYear();
   const parser = new XMLParser({ removeNSPrefix: true, isArray: (name) => name === 'entry' });
-  const responses = await Promise.all([year, year - 1].map((item) => fetch(`https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value=${item}`, { cache: 'no-store' })));
+  const responses = await Promise.all([year, year - 1].map((item) => fetchWithTimeout(`https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value=${item}`, { cache: 'no-store' }, officialDataTimeoutMs)));
   if (responses.some((response) => !response.ok)) throw new Error('US Treasury request failed');
   const rows = (await Promise.all(responses.map((response) => response.text()))).flatMap((xml) => {
     const parsed = parser.parse(xml) as { feed?: { entry?: Array<{ content?: { properties?: Record<string, unknown> } }> } };
@@ -192,12 +235,14 @@ async function fetchTreasuryQuotes(): Promise<Record<string, TreasuryQuote>> {
     updatedAt: Date.parse(`${latest.date}T00:00:00Z`),
     dataDate: latest.date,
   }]));
+  });
 }
 
 async function fetchCryptoQuotes(): Promise<Record<string, Quote>> {
+  return withServerCache(cryptoCache, 'coinbase:stats', cryptoCacheTtlMs, async () => {
   const quotes = await Promise.all(cryptoSymbols.map(async (symbol) => {
     const productId = symbol === 'bitcoin' ? 'BTC-USD' : 'ETH-USD';
-    const response = await fetch(`https://api.exchange.coinbase.com/products/${productId}/stats`, { cache: 'no-store' });
+    const response = await fetchWithTimeout(`https://api.exchange.coinbase.com/products/${productId}/stats`, { cache: 'no-store' }, marketRequestTimeoutMs);
     if (!response.ok) throw new Error(`Coinbase responded with ${response.status}`);
 
     const data = (await response.json()) as CoinbaseStatsResponse;
@@ -219,6 +264,7 @@ async function fetchCryptoQuotes(): Promise<Record<string, Quote>> {
   }));
 
   return Object.fromEntries(quotes);
+  });
 }
 
 function toNumber(value: string | undefined) {
@@ -227,12 +273,7 @@ function toNumber(value: string | undefined) {
 }
 
 function withMacroCache(key: string, fetchMacro: () => Promise<Record<string, MacroQuote>>) {
-  const cached = macroCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return Promise.resolve(cached.values);
-  return fetchMacro().then((values) => {
-    macroCache.set(key, { values, expiresAt: Date.now() + macroCacheTtlMs });
-    return values;
-  });
+  return withServerCache(macroCache, key, macroCacheTtlMs, fetchMacro);
 }
 
 function makeMacroQuote(values: Array<{ value: number; referencePeriod: string }>, source: string, unit: MacroQuote['unit']) {
@@ -249,7 +290,7 @@ async function fetchBlsMacro(apiKey: string) {
       { id: 'CES0000000001', key: 'nonfarmPayrolls', unit: 'thousands' as const },
       { id: 'LNS14000000', key: 'unemploymentRate', unit: 'percent' as const },
     ];
-    const response = await fetch('https://api.bls.gov/publicAPI/v2/timeseries/data/', {
+    const response = await fetchWithTimeout('https://api.bls.gov/publicAPI/v2/timeseries/data/', {
       method: 'POST',
       cache: 'no-store',
       headers: {
@@ -258,7 +299,7 @@ async function fetchBlsMacro(apiKey: string) {
         'User-Agent': 'global-market-dashboard/1.0',
       },
       body: JSON.stringify({ seriesid: seriesDefinitions.map((series) => series.id), registrationkey: apiKey }),
-    });
+    }, officialDataTimeoutMs);
     if (!response.ok) throw new Error(`BLS responded with ${response.status}`);
     const data = (await response.json()) as BlsResponse;
     if (data.status !== 'REQUEST_SUCCEEDED') throw new Error(`BLS request failed: ${(data.message ?? [data.status ?? 'unknown error']).join('; ')}`);
@@ -287,7 +328,7 @@ function beaValues(rows: BeaRow[] | undefined, matches: (description: string) =>
 async function fetchBeaTable(apiKey: string, tableName: string, frequency: 'M' | 'Q') {
   const url = new URL('https://apps.bea.gov/api/data');
   url.search = new URLSearchParams({ UserID: apiKey, method: 'GetData', datasetname: 'NIPA', TableName: tableName, Frequency: frequency, Year: 'X', ResultFormat: 'JSON' }).toString();
-  const response = await fetch(url, { cache: 'no-store' });
+  const response = await fetchWithTimeout(url, { cache: 'no-store' }, officialDataTimeoutMs);
   if (!response.ok) throw new Error(`BEA responded with ${response.status}`);
   const data = (await response.json()) as BeaResponse;
   const rows = data.BEAAPI?.Results?.Data;
@@ -317,7 +358,7 @@ async function fetchBeaGdpMacro(apiKey: string) {
 async function fetchEffectiveFedFundsRate() {
   return withMacroCache('h15-effective-fed-funds', async () => {
     const url = 'https://www.federalreserve.gov/datadownload/Output.aspx?rel=H15&series=RIFSPFF_N.D&lastobs=&from=&to=&filetype=csv&label=include&layout=seriescolumn&type=package';
-    const response = await fetch(url, { cache: 'no-store' });
+    const response = await fetchWithTimeout(url, { cache: 'no-store' }, officialDataTimeoutMs);
     if (!response.ok) throw new Error(`Federal Reserve Board responded with ${response.status}`);
     const observations = (await response.text()).split(/\r?\n/).map((line) => line.replace(/"/g, '').split(',')).filter((cells) => /^\d{4}-\d{2}-\d{2}$/.test(cells[0] ?? '')).map((cells) => ({ value: toNumber(cells.at(-1)), referencePeriod: cells[0] })).filter((item) => Number.isFinite(item.value)).sort((left, right) => right.referencePeriod.localeCompare(left.referencePeriod));
     return { effectiveFedFundsRate: makeMacroQuote(observations, 'Federal Reserve Board H.15', 'percent') };
@@ -360,19 +401,18 @@ function sampleHistory(values: Array<number | null | undefined>) {
 }
 
 async function withHistoryCache(key: string, fetchHistory: () => Promise<number[]>) {
-  const cached = historyCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return cached.values;
-  const values = await fetchHistory();
-  if (values.length < 2) throw new Error('Insufficient historical data');
-  historyCache.set(key, { values, expiresAt: Date.now() + historyCacheTtlMs });
-  return values;
+  return withServerCache(historyCache, key, historyCacheTtlMs, async () => {
+    const values = await fetchHistory();
+    if (values.length < 2) throw new Error('Insufficient historical data');
+    return values;
+  });
 }
 
 async function fetchYahooHistory(symbol: string, range: HistoryRange) {
   const request = getHistoryRequest(range);
   return withHistoryCache(`yahoo:${symbol}:${range}`, async () => {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${request.yahooRange}&interval=${request.yahooInterval}`;
-    const response = await fetch(url, { cache: 'no-store', headers: { 'User-Agent': 'Mozilla/5.0 (personal-market-dashboard)' } });
+    const response = await fetchWithTimeout(url, { cache: 'no-store', headers: { 'User-Agent': 'Mozilla/5.0 (personal-market-dashboard)' } }, historyRequestTimeoutMs);
     if (!response.ok) throw new Error(`Yahoo Finance responded with ${response.status}`);
     const data = (await response.json()) as YahooChartResponse;
     return sampleHistory(data.chart?.result?.[0]?.indicators?.quote?.[0]?.close ?? []);
@@ -383,7 +423,7 @@ async function fetchFinnhubHistory(symbol: string, apiKey: string, range: Histor
   const request = getHistoryRequest(range);
   return withHistoryCache(`finnhub:${symbol}:${range}`, async () => {
     const url = `https://finnhub.io/api/v1/stock/candle?symbol=${encodeURIComponent(symbol)}&resolution=${request.finnhubResolution}&from=${request.from}&to=${Math.floor(Date.now() / 1000)}&token=${encodeURIComponent(apiKey)}`;
-    const response = await fetch(url, { cache: 'no-store' });
+    const response = await fetchWithTimeout(url, { cache: 'no-store' }, historyRequestTimeoutMs);
     if (!response.ok) throw new Error(`Finnhub responded with ${response.status}`);
     const data = (await response.json()) as FinnhubCandleResponse;
     if (data.s !== 'ok') throw new Error('Finnhub returned no historical data');
@@ -401,7 +441,7 @@ async function fetchCoinbaseHistory(symbol: 'bitcoin' | 'ethereum', range: Histo
     for (let start = request.from; start < end; start += maxCandlesPerRequest * request.coinbaseGranularity) {
       const chunkEnd = Math.min(end, start + maxCandlesPerRequest * request.coinbaseGranularity);
       const url = `https://api.exchange.coinbase.com/products/${productId}/candles?granularity=${request.coinbaseGranularity}&start=${new Date(start * 1000).toISOString()}&end=${new Date(chunkEnd * 1000).toISOString()}`;
-      const response = await fetch(url, { cache: 'no-store' });
+      const response = await fetchWithTimeout(url, { cache: 'no-store' }, historyRequestTimeoutMs);
       if (!response.ok) throw new Error(`Coinbase responded with ${response.status}`);
       const chunk = (await response.json()) as Array<[number, number, number, number, number, number]>;
       candles.push(...chunk);
@@ -446,45 +486,55 @@ export async function GET(request: Request) {
   const requestedSymbols = searchParams.get('symbols')?.split(',') ?? defaultFinnhubSymbols;
   const finnhubSymbols = [...new Set(requestedSymbols.map((symbol) => symbol.trim().toUpperCase()).filter((symbol) => symbolPattern.test(symbol)))].slice(0, maxFinnhubSymbols);
 
-  await Promise.all(yahooSymbols.map(async (symbol) => {
+  const finnhubKey = process.env.FINNHUB_API_KEY;
+  let macroResult = { macro: { ...fallbackMacro }, errors: [] as string[] };
+
+  const yahooTask = Promise.all(yahooSymbols.map(async (symbol) => {
     try {
       quotes[symbol] = await fetchYahooQuote(symbol);
     } catch {
       quotes[symbol] = getFallbackQuote(symbol);
-      errors.push(`${symbol} 暂时无法从 Yahoo Finance 获取数据`);
+      errors.push(symbol + ' could not be loaded from Yahoo Finance');
     }
   }));
 
-  const finnhubKey = process.env.FINNHUB_API_KEY;
-  if (!finnhubKey) {
-    finnhubSymbols.forEach((symbol) => {
-      quotes[symbol] = getFallbackQuote(symbol);
-    });
-    errors.push('Finnhub API Key 尚未配置，美股个股暂时使用模拟数据');
-  } else {
-    await Promise.all(finnhubSymbols.map(async (symbol) => {
+  const finnhubTask = !finnhubKey
+    ? Promise.resolve().then(() => {
+      finnhubSymbols.forEach((symbol) => {
+        quotes[symbol] = getFallbackQuote(symbol);
+      });
+      errors.push('Finnhub API Key is not configured; watchlist is using fallback data');
+    })
+    : Promise.all(finnhubSymbols.map(async (symbol) => {
       try {
         quotes[symbol] = await fetchFinnhubQuote(symbol, finnhubKey);
       } catch {
         quotes[symbol] = getFallbackQuote(symbol);
-        errors.push(`${symbol} 暂时无法从 Finnhub 获取数据`);
+        errors.push(symbol + ' could not be loaded from Finnhub');
       }
-    }));
-  }
+    })).then(() => undefined);
 
-  try {
-    treasury = await fetchTreasuryQuotes();
-  } catch {
-    treasury = fallbackTreasuryQuotes;
-    errors.push('US Treasury 暂时无法获取官方收益率，当前使用模拟数据');
-  }
+  const treasuryTask = fetchTreasuryQuotes()
+    .then((values) => { treasury = values; })
+    .catch(() => {
+      treasury = fallbackTreasuryQuotes;
+      errors.push('US Treasury data is unavailable; using fallback data');
+    });
 
-  try {
-    crypto = await fetchCryptoQuotes();
-  } catch {
-    crypto = fallbackCryptoQuotes;
-    errors.push('Coinbase 暂时无法获取 BTC/ETH，当前使用模拟数据');
-  }
+  const cryptoTask = fetchCryptoQuotes()
+    .then((values) => { crypto = values; })
+    .catch(() => {
+      crypto = fallbackCryptoQuotes;
+      errors.push('Coinbase BTC/ETH data is unavailable; using fallback data');
+    });
+
+  const macroTask = fetchMacroData(process.env.BLS_API_KEY, process.env.BEA_API_KEY)
+    .then((result) => { macroResult = result; })
+    .catch(() => {
+      errors.push('Macro data is unavailable; using fallback data');
+    });
+
+  await Promise.all([yahooTask, finnhubTask, treasuryTask, cryptoTask, macroTask]);
 
   const historyTasks: HistoryTask[] = [
     ...yahooSymbols.filter((symbol) => quotes[symbol]?.source === 'Yahoo Finance').map((symbol) => ({ symbol, provider: 'yahoo' as const })),
@@ -492,11 +542,8 @@ export async function GET(request: Request) {
     ...cryptoSymbols.filter((symbol) => crypto[symbol]?.source === 'Coinbase').map((symbol) => ({ symbol, provider: 'coinbase' as const })),
   ];
   const { history, failures: historyFailures } = await fetchHistories(historyTasks, range, finnhubKey);
-  if (historyFailures) errors.push('部分历史行情暂时无法获取，当前保留模拟走势图');
-
-  const macroResult = await fetchMacroData(process.env.BLS_API_KEY, process.env.BEA_API_KEY);
+  if (historyFailures) errors.push('Some historical data is unavailable; preserving the fallback chart');
   errors.push(...macroResult.errors);
-
   const updatedValues = [...Object.values(quotes), ...Object.values(treasury), ...Object.values(crypto)].map((quote) => quote.updatedAt).filter(Boolean);
   return NextResponse.json({
     quotes,
