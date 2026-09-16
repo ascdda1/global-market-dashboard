@@ -1,0 +1,4 @@
+.refresh:disabled { cursor: wait; opacity: .65; }
+.market-alert { display: flex; align-items: flex-start; gap: 10px; border: 1px solid rgba(226, 185, 107, .28); border-radius: 6px; background: rgba(226, 185, 107, .07); color: #b6a272; padding: 11px 14px; margin: -15px 0 28px; font-size: 10px; }
+.market-alert > span { display: grid; place-items: center; flex: 0 0 16px; height: 16px; border: 1px solid #b6a272; border-radius: 50%; font: 10px 'DM Mono'; }
+.market-alert p { margin: 0; line-height: 1.6; }
