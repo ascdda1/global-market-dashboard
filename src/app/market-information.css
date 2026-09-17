@@ -1,2 +1,19 @@
 .news-filters { display: flex; gap: 5px; overflow-x: auto; padding: 3px 0 7px; }.news-filters button { flex: 0 0 auto; min-height: 29px; padding: 3px 7px; border: 1px solid var(--border); border-radius: 4px; color: var(--secondary); background: #171c22; font-size: 12px; font-weight: 600; }.news-filters button.selected { border-color: #92641c; color: var(--amber); background: var(--amber-soft); }.news-row { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 9px; padding: 9px 0; border-bottom: 1px solid #2c333c; color: inherit; text-decoration: none; }.news-row:hover { background: #20262d; }.news-row time { padding-top: 2px; color: var(--muted); font-size: 13px; font-weight: 600; }.news-row strong { display: block; overflow: hidden; color: var(--text); font-size: 17px; font-weight: 650; line-height: 1.28; text-overflow: ellipsis; white-space: nowrap; }.news-row p { display: -webkit-box; overflow: hidden; margin: 3px 0; color: var(--secondary); font-size: 14px; line-height: 1.32; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }.news-row small { color: var(--muted); font-size: 13px; }.people-list { padding-top: 2px; }.person-row { display: grid; grid-template-columns: 34px minmax(95px, .72fr) minmax(0, 1.35fr); align-items: center; gap: 9px; padding: 10px 0; border-bottom: 1px solid #2c333c; color: inherit; text-decoration: none; }.person-row:last-child { border-bottom: 0; }.person-row:hover { background: #20262d; }.person-avatar { display: grid; width: 33px; height: 33px; place-items: center; border-radius: 50%; color: var(--text); background: #303b49; font-size: 12px; font-weight: 700; }.person-row strong { display: block; overflow: hidden; color: var(--text); font-size: 17px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }.person-row > div > small { display: grid; overflow: hidden; margin-top: 3px; color: var(--secondary); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }.person-row small em { margin-top: 2px; color: var(--muted); font-size: 13px; font-style: normal; }.person-update { min-width: 0; text-align: right; }.person-update > span { display: block; overflow: hidden; color: var(--secondary); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }.person-update time { display: block; margin-top: 3px; color: var(--muted); font-size: 13px; }.information-empty { margin: 0; padding: 28px 8px; color: var(--muted); font-size: 15px; text-align: center; }
 @media (max-width: 700px) { .person-row { grid-template-columns: 34px minmax(98px, .75fr) minmax(0, 1.2fr); }.news-row strong { font-size: 16px; } }
+
+@media (min-width: 701px) {
+  .news-filters { gap: 3px; padding: 2px 0 5px; }
+  .news-filters button { min-height: 24px; padding: 2px 5px; font-size: 9px; }
+  .news-row { grid-template-columns: 42px minmax(0, 1fr); gap: 7px; padding: 6px 0; }
+  .news-row time { font-size: 10px; }
+  .news-row strong { font-size: 12px; line-height: 1.24; }
+  .news-row p { margin: 2px 0; font-size: 10px; }
+  .news-row small { font-size: 9px; }
+  .person-row { grid-template-columns: 27px minmax(78px, .72fr) minmax(0, 1.35fr); gap: 6px; padding: 7px 0; }
+  .person-avatar { width: 26px; height: 26px; font-size: 9px; }
+  .person-row strong { font-size: 12px; }
+  .person-row > div > small { margin-top: 1px; font-size: 10px; }
+  .person-row small em, .person-update > span, .person-update time { font-size: 9px; }
+  .person-update time { margin-top: 1px; }
+  .information-empty { padding: 18px 6px; font-size: 11px; }
+}

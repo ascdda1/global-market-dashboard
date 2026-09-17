@@ -78,3 +78,118 @@ footer { display: flex; justify-content: space-between; gap: 15px; margin-top: 2
 @media (max-width: 1180px) { .sidebar { width: 210px; }.content { width: calc(100% - 210px); margin-left: 210px; }.header-search { width: 235px; }.dashboard-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.macro-summary { grid-column: span 2; }.dashboard-information-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.people-panel { grid-column: span 2; }.market-grid, .macro-detail-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 900px) { .dashboard-header { min-height: 112px; }.date-time { display: none; }.header-search { width: 240px; }.primary-market-grid, .dashboard-summary-grid, .dashboard-information-grid, .market-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.macro-summary, .people-panel { grid-column: auto; }.macro-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 700px) { body { font-size: 16px; }.sidebar { width: min(288px, 82vw); transform: translateX(-102%); transition: transform .2s ease; }.sidebar.mobile-open { transform: translateX(0); }.mobile-sidebar-scrim { position: fixed; z-index: 9; inset: 0; display: block; border: 0; background: #00000099; }.content { width: 100%; margin-left: 0; padding: 0 12px 22px; }.mobile-nav-toggle { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; padding: 0; border: 1px solid var(--border); border-radius: 5px; color: var(--amber); background: var(--sidebar); font-size: 20px; }.dashboard-header { min-height: 105px; gap: 10px; }.header-title h1 { font-size: 32px; }.header-title p { font-size: 20px; }.header-actions { margin-left: auto; }.header-search { display: none; }.market-alert { align-items: flex-start; flex-wrap: wrap; }.market-alert .refresh { margin-left: 25px; }.primary-market-grid, .dashboard-summary-grid, .dashboard-information-grid, .market-grid, .additional-market-grid, .macro-detail-grid { grid-template-columns: 1fr; }.primary-market-card { height: 280px; min-height: 280px; }.card-label h3 { font-size: 20px; }.card-label p { font-size: 15px; }.card-quote strong { font-size: 35px; }.card-quote .change { font-size: 20px; }.compact-section-heading { align-items: flex-start; flex-direction: column; }.watchlist-tools { width: 100%; }.watchlist-tools input { flex: 1; min-width: 0; }.dashboard-information-grid .terminal-panel { min-height: 0; }.terminal-panel { padding: 14px; } .panel-heading .bilingual-text, .compact-section-heading > .bilingual-text { font-size: 22px; }.table-row { font-size: 16px; }.calendar-table-wrap { max-width: 100%; overflow-x: auto; } footer { flex-direction: column; } }
+
+/* Desktop terminal-density pass. Mobile sizing above remains deliberately readable. */
+@media (min-width: 701px) {
+  body { font-size: 13px; }
+  .sidebar { width: 196px; padding: 14px 10px 12px; }
+  .brand { gap: 8px; margin-bottom: 14px; }
+  .brand-mark { width: 31px; height: 31px; font-size: 20px; }
+  .brand strong { font-size: 16px; }
+  .brand small { margin-top: 2px; font-size: 10px; }
+  .sidebar nav { gap: 3px; }
+  .nav-item { gap: 9px; min-height: 39px; padding: 4px 8px; }
+  .nav-item.active::before { height: 20px; }
+  .nav-icon { width: 16px; font-size: 16px; }
+  .nav-text { font-size: 13px; }
+  .nav-text small { margin-top: 1px; font-size: 10px; }
+  .sidebar-bottom { padding: 12px 7px 0; }
+  .sidebar-bottom p { margin-bottom: 8px; font-size: 10px; }
+  .sidebar-data-status { font-size: 10px; }
+
+  .content { width: calc(100% - 196px); margin-left: 196px; padding: 0 14px 18px; }
+  .dashboard-header { min-height: 68px; gap: 14px; }
+  .header-title h1 { font-size: 26px; font-weight: 700; }
+  .header-title p { margin-top: 2px; font-size: 14px; }
+  .header-actions { gap: 10px; }
+  .date-time { padding-right: 10px; font-size: 10px; }
+  .date-time strong { font-size: 15px; }
+  .date-time small { font-size: 9px; }
+  .header-search { width: min(300px, 24vw); min-height: 35px; padding: 0 10px; font-size: 12px; }
+  .header-search > span:first-child { font-size: 18px; }
+  .header-statement { font-size: 11px; }
+
+  .market-alert { min-height: 29px; margin: 7px 0 8px; padding: 4px 8px; font-size: 11px; }
+  .market-alert .refresh { font-size: 11px; }
+  .primary-markets { padding-top: 8px; }
+  .section-kicker { gap: 6px; margin-bottom: 8px; }
+  .section-kicker > span { font-size: 15px; }
+  .section-kicker .bilingual-text { font-size: 19px; }
+  .section-kicker .bilingual-text small { margin-top: 1px; font-size: 10px; letter-spacing: .04em; }
+  .primary-market-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+
+  .market-card { min-height: 142px; padding: 11px; }
+  .primary-market-card { height: 168px; min-height: 168px; }
+  .card-topline { gap: 7px; }
+  .symbol-box { width: 25px; height: 25px; font-size: 9px; }
+  .card-label h3 { font-size: 15px; line-height: 1.12; }
+  .card-label p { margin-top: 2px; font-size: 11px; }
+  .card-badges { gap: 2px; }
+  .ticker-badge { min-height: 19px; padding: 2px 5px; font-size: 10px; }
+  .session-badge { min-width: 45px; padding: 2px 4px; font-size: 9px; }
+  .session-badge small { font-size: 8px; }
+  .watch-button { font-size: 18px; }
+  .card-quote { padding: 7px 0 3px; }
+  .card-quote strong { font-size: clamp(22px, 1.55vw, 26px); }
+  .card-quote .change { margin-top: 3px; font-size: 13px; }
+  .change em { margin-left: 4px; }
+  .card-chart { min-height: 28px; padding-right: 30px; }
+  .sparkline { min-height: 28px; }
+  .chart-axis { font-size: 8px; }
+  .card-data-state { min-height: 17px; font-size: 9px; }
+  .card-data-state > i, .status-badge > i { width: 6px; height: 6px; flex-basis: 6px; }
+  .card-data-state small, .status-badge small, .card-data-state > b { font-size: 8px; }
+  .card-range-tabs { gap: 3px; padding-top: 3px; }
+  .card-range-tabs button { min-width: 24px; padding: 2px; font-size: 10px; }
+  .card-footer { padding-top: 6px; font-size: 10px; }
+
+  .dashboard-summary-grid, .dashboard-information-grid { gap: 12px; margin-top: 12px; }
+  .terminal-panel { min-height: 205px; padding: 12px; }
+  .panel-heading { min-height: 37px; gap: 7px; }
+  .panel-heading > div { gap: 6px; }
+  .panel-icon { width: 20px; height: 20px; flex-basis: 20px; font-size: 16px; }
+  .panel-heading .bilingual-text { font-size: 18px; }
+  .panel-heading .bilingual-text small { margin-top: 1px; font-size: 10px; letter-spacing: .04em; }
+  .view-more { font-size: 11px; }
+  .view-more small { margin-top: 1px; font-size: 9px; }
+  .view-more b { font-size: 13px; }
+  .table-row { min-height: 37px; font-size: 12px; }
+  .table-row > strong { font-size: 13px; }
+  .table-row .bilingual-text { font-size: 12px; }
+  .table-row .bilingual-text small, .table-heading small { margin-top: 1px; font-size: 9px; }
+  .table-head { min-height: 34px; font-size: 11px; }
+  .coin-name { gap: 6px; }
+  .coin-name i { width: 20px; height: 20px; flex-basis: 20px; }
+  .macro-summary-table .table-row { min-height: 34px; font-size: 11px; }
+  .macro-summary-table .table-row > strong { font-size: 12px; }
+  .macro-summary-table .table-row > small, .macro-summary-table .bilingual-text { font-size: 10px; }
+  .macro-summary-table .bilingual-text small { font-size: 8px; }
+  .status-badge { gap: 4px; font-size: 10px; }
+  .dashboard-information-grid .terminal-panel { min-height: 260px; }
+
+  .additional-data, .watchlist-section { margin-top: 24px; }
+  .compact-section-heading { gap: 8px; margin-bottom: 10px; }
+  .compact-section-heading > .bilingual-text { font-size: 19px; }
+  .compact-section-heading > .bilingual-text small { margin-top: 1px; font-size: 10px; letter-spacing: .04em; }
+  .compact-section-heading > span { font-size: 10px; }
+  .market-grid, .macro-detail-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .macro-detail-card { min-height: 118px; padding: 12px; }
+  .macro-detail-card > .bilingual-text { font-size: 13px; }
+  .macro-detail-card > .bilingual-text small { font-size: 10px; }
+  .macro-detail-card strong { margin: 8px 0; font-size: 22px; }
+  .macro-detail-card div { font-size: 11px; }
+  .watchlist-tools { gap: 6px; }
+  .watchlist-tools input { width: 190px; height: 32px; padding: 0 8px; font-size: 11px; }
+  .watchlist-tools button { height: 32px; padding: 0 9px; font-size: 11px; }
+  .watchlist-tools button small { font-size: 8px; }
+  footer { gap: 10px; margin-top: 18px; padding-top: 10px; font-size: 10px; }
+}
+
+@media (min-width: 701px) and (max-width: 1180px) {
+  .sidebar { width: 184px; }
+  .content { width: calc(100% - 184px); margin-left: 184px; }
+  .header-search { width: 210px; }
+  .dashboard-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-information-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .market-grid, .macro-detail-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
