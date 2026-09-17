@@ -11,7 +11,13 @@ export type MarketItem = {
   source: string;
   updatedAt: number;
   dataDate?: string;
+  previousClose?: number;
+  status?: MarketDataStatus;
+  session?: MarketSession;
 };
+
+export type MarketDataStatus = 'real' | 'cache' | 'fallback';
+export type MarketSession = 'overnight' | 'pre' | 'regular' | 'after' | 'closed';
 
 export type ApiQuote = {
   value: number;
@@ -20,6 +26,9 @@ export type ApiQuote = {
   source: string;
   updatedAt: number;
   dataDate?: string;
+  previousClose?: number;
+  status?: MarketDataStatus;
+  session?: MarketSession;
 };
 
 export type TreasuryQuote = ApiQuote & {

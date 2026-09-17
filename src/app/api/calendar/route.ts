@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getEconomicCalendar } from '../../economic-calendar-provider';
+import { safeErrorMessage, sanitizePublicErrors } from '../safe-error';
 
 const cacheTtlMs = 5 * 60_000;
 let cachedResponse: Awaited<ReturnType<typeof getEconomicCalendar>> | null = null;
@@ -11,8 +12,8 @@ export async function GET() {
       cachedResponse = await getEconomicCalendar();
       cacheExpiresAt = Date.now() + cacheTtlMs;
     }
-    return NextResponse.json(cachedResponse);
+    return NextResponse.json({ ...cachedResponse, errors: sanitizePublicErrors('Economic Calendar', cachedResponse.errors) });
   } catch {
-    return NextResponse.json({ events: [], source: 'Unavailable', isFallback: true, lastUpdated: Date.now(), errors: ['经济日历暂时无法加载'] }, { status: 200 });
+    return NextResponse.json({ events: [], source: 'Unavailable', isFallback: true, lastUpdated: Date.now(), errors: [safeErrorMessage('Economic Calendar')] }, { status: 200 });
   }
 }

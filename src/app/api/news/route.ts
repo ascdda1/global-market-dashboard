@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getMarketNews } from '../../information-providers';
+import { safeErrorMessage, sanitizePublicErrors } from '../safe-error';
 
 const cacheTtlMs = 5 * 60_000;
 let cachedResponse: Awaited<ReturnType<typeof getMarketNews>> | null = null;
@@ -11,8 +12,8 @@ export async function GET() {
       cachedResponse = await getMarketNews();
       cacheExpiresAt = Date.now() + cacheTtlMs;
     }
-    return NextResponse.json(cachedResponse);
+    return NextResponse.json({ ...cachedResponse, errors: sanitizePublicErrors('Market News', cachedResponse.errors) });
   } catch {
-    return NextResponse.json({ items: [], source: 'Unavailable', isFallback: true, lastUpdated: Date.now(), errors: ['Market News 暂时无法加载'] });
+    return NextResponse.json({ items: [], source: 'Unavailable', isFallback: true, lastUpdated: Date.now(), errors: [safeErrorMessage('Market News')] });
   }
 }

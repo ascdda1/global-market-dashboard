@@ -5,7 +5,7 @@ import './dashboard-polish.css';
 
 export const metadata: Metadata = {
   title: 'Global Markets | 全球市场看板',
-  description: '全球主要市场实时模拟行情看板',
+  description: '全球主要市场行情与自动定投模拟看板',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

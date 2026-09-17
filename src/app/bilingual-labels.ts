@@ -1,91 +1,35 @@
-export type BilingualLabel = {
-  en: string;
-  zh: string;
-};
+export type BilingualLabel = { en: string; zh: string };
 
 export const moduleLabels = {
-  marketOverview: { en: 'Market Overview', zh: '市场概览' },
-  majorMarkets: { en: 'Major Markets', zh: '主要市场' },
-  usTreasury: { en: 'US Treasury', zh: '美国国债' },
-  crypto: { en: 'Crypto', zh: '加密资产' },
-  watchlist: { en: 'My Watchlist', zh: '我的自选' },
-  macro: { en: 'US Macro', zh: '美国宏观经济' },
-  economicCalendar: { en: 'Economic Calendar', zh: '经济日历' },
-  marketNews: { en: 'Market News', zh: '市场新闻' },
-  keyPeople: { en: 'Key People', zh: '重要人物' },
-  marketInformation: { en: 'Market Information', zh: '市场资讯' },
+  dashboard: { en: 'Dashboard', zh: '仪表盘' }, markets: { en: 'Markets', zh: '市场' }, macroNav: { en: 'Macro', zh: '宏观' }, calendar: { en: 'Calendar', zh: '日历' }, newsNav: { en: 'News', zh: '新闻' }, dcaSimulation: { en: 'DCA Simulation', zh: '自动定投模拟' }, settings: { en: 'Settings', zh: '设置' },
+  marketOverview: { en: 'Global Market Overview', zh: '全球市场总览' }, treasuryYields: { en: 'Treasury Yields', zh: '美国国债收益率' }, crypto: { en: 'Crypto', zh: '加密资产' }, macroIndicators: { en: 'Macro Indicators', zh: '宏观经济指标' }, economicCalendar: { en: 'Economic Calendar', zh: '经济日历' }, marketNews: { en: 'Latest News', zh: '最新市场新闻' }, keyPeople: { en: 'Key People', zh: '关键人物' }, moreMarkets: { en: 'More Markets', zh: '更多市场' }, moreMacro: { en: 'Additional US Macro', zh: '更多美国宏观经济指标' }, watchlist: { en: 'Watchlist', zh: '自选关注' },
 } satisfies Record<string, BilingualLabel>;
 
 export const assetLabels: Record<string, BilingualLabel> = {
-  '^DJI': { en: 'Dow Jones Industrial Average (DJIA)', zh: '\u9053\u743c\u65af\u5de5\u4e1a\u5e73\u5747\u6307\u6570' },
-  '^GSPC': { en: 'S&P 500', zh: '标普500指数' },
-  '^IXIC': { en: 'Nasdaq Composite', zh: '纳斯达克综合指数' },
-  'GC=F': { en: 'Gold', zh: '黄金' },
-  'CL=F': { en: 'WTI Crude Oil', zh: 'WTI原油' },
-  US2Y: { en: 'US Treasury 2Y', zh: '美国2年期国债收益率' },
-  US10Y: { en: 'US Treasury 10Y', zh: '美国10年期国债收益率' },
-  US30Y: { en: 'US Treasury 30Y', zh: '美国30年期国债收益率' },
-  bitcoin: { en: 'Bitcoin (BTC)', zh: '比特币' },
-  ethereum: { en: 'Ethereum (ETH)', zh: '以太坊' },
+  QQQM: { en: 'NASDAQ-100 ETF', zh: '纳斯达克100 ETF' }, SPYM: { en: 'S&P 500 ETF', zh: '标普500 ETF' }, DIA: { en: 'Dow Jones ETF', zh: '道琼斯工业平均 ETF' }, SMH: { en: 'Semiconductor ETF', zh: '半导体 ETF' }, VGT: { en: 'Information Technology ETF', zh: '信息科技 ETF' }, AVGO: { en: 'Broadcom', zh: '博通' }, NVDA: { en: 'NVIDIA', zh: '英伟达' },
+  '^DJI': { en: 'Dow Jones Industrial Average (DJIA)', zh: '道琼斯工业平均指数' }, '^GSPC': { en: 'S&P 500', zh: '标普500指数' }, '^IXIC': { en: 'Nasdaq Composite', zh: '纳斯达克综合指数' }, 'GC=F': { en: 'Gold Spot', zh: '现货黄金' }, 'CL=F': { en: 'WTI Crude Oil', zh: 'WTI原油' },
+  US2Y: { en: 'US 2-Year Treasury', zh: '美国2年期国债收益率' }, US10Y: { en: 'U.S. 10-Year Treasury', zh: '美国10年期国债收益率' }, US30Y: { en: 'US 30-Year Treasury', zh: '美国30年期国债收益率' }, bitcoin: { en: 'Bitcoin', zh: '比特币' }, ethereum: { en: 'Ethereum', zh: '以太坊' },
 };
 
 export const macroLabels: Record<string, BilingualLabel> = {
-  cpi: { en: 'Consumer Price Index (CPI)', zh: '消费者价格指数' },
-  coreCpi: { en: 'Core CPI', zh: '核心消费者价格指数' },
-  pce: { en: 'PCE Price Index', zh: '个人消费支出价格指数' },
-  corePce: { en: 'Core PCE Price Index', zh: '核心个人消费支出价格指数' },
-  nonfarmPayrolls: { en: 'Nonfarm Payrolls', zh: '非农就业人数' },
-  unemploymentRate: { en: 'Unemployment Rate', zh: '失业率' },
-  gdp: { en: 'Gross Domestic Product (GDP)', zh: '国内生产总值' },
-  effectiveFedFundsRate: { en: 'Effective Federal Funds Rate', zh: '有效联邦基金利率' },
+  cpi: { en: 'CPI (YoY)', zh: '消费者物价指数（同比）' }, coreCpi: { en: 'Core CPI (YoY)', zh: '核心CPI（同比）' }, pce: { en: 'PCE Price Index', zh: '个人消费支出价格指数' }, corePce: { en: 'Core PCE Price Index', zh: '核心PCE价格指数' }, nonfarmPayrolls: { en: 'Nonfarm Payrolls', zh: '非农就业' }, unemploymentRate: { en: 'Unemployment Rate', zh: '失业率' }, gdp: { en: 'GDP (QoQ)', zh: 'GDP（环比）' }, effectiveFedFundsRate: { en: 'Fed Funds Rate', zh: '联邦基金利率' },
 };
 
 const calendarEventLabels: Record<string, BilingualLabel> = {
-  'Core CPI (MoM)': { en: 'Core CPI (MoM)', zh: '核心消费者价格指数（月率）' },
-  'Eurozone CPI (YoY)': { en: 'Eurozone CPI (YoY)', zh: '欧元区消费者价格指数（年率）' },
-  'PBOC Loan Prime Rate (1Y)': { en: 'PBOC Loan Prime Rate (1Y)', zh: '中国贷款市场报价利率（1年期）' },
-  'Fed Chair Speech': { en: 'Fed Chair Speech', zh: '美联储主席讲话' },
-  'CPI (YoY)': { en: 'CPI (YoY)', zh: '消费者价格指数（年率）' },
-  'Retail Sales (MoM)': { en: 'Retail Sales (MoM)', zh: '零售销售（月率）' },
-  'ECB Interest Rate Decision': { en: 'ECB Interest Rate Decision', zh: '欧洲央行利率决议' },
-  'ECB President Press Conference': { en: 'ECB President Press Conference', zh: '欧洲央行行长新闻发布会' },
-  'Japan CPI (YoY)': { en: 'Japan CPI (YoY)', zh: '日本消费者价格指数（年率）' },
-  'UK CPI (YoY)': { en: 'UK CPI (YoY)', zh: '英国消费者价格指数（年率）' },
-  'UK GDP (MoM)': { en: 'UK GDP (MoM)', zh: '英国国内生产总值（月率）' },
-  'BOJ Interest Rate Decision': { en: 'BOJ Interest Rate Decision', zh: '日本央行利率决议' },
-  'BOJ Governor Press Conference': { en: 'BOJ Governor Press Conference', zh: '日本央行行长新闻发布会' },
-  'PPI (MoM)': { en: 'PPI (MoM)', zh: '生产者价格指数（月率）' },
-  'FOMC Interest Rate Decision': { en: 'FOMC Interest Rate Decision', zh: '美联储利率决议' },
-  'FOMC Press Conference': { en: 'FOMC Press Conference', zh: '美联储新闻发布会' },
-  'PCE Price Index (MoM)': { en: 'PCE Price Index (MoM)', zh: '个人消费支出价格指数（月率）' },
-  'Core PCE Price Index (MoM)': { en: 'Core PCE Price Index (MoM)', zh: '核心个人消费支出价格指数（月率）' },
-  'China CPI (YoY)': { en: 'China CPI (YoY)', zh: '中国消费者价格指数（年率）' },
-  'China PPI (YoY)': { en: 'China PPI (YoY)', zh: '中国生产者价格指数（年率）' },
-  'Nonfarm Payrolls': { en: 'Nonfarm Payrolls', zh: '非农就业人数' },
-  'Unemployment Rate': { en: 'Unemployment Rate', zh: '失业率' },
-  'GDP (Annualized QoQ)': { en: 'GDP (Annualized QoQ)', zh: '国内生产总值（年化季率）' },
-  'ISM Manufacturing PMI': { en: 'ISM Manufacturing PMI', zh: 'ISM制造业PMI' },
-  'ISM Services PMI': { en: 'ISM Services PMI', zh: 'ISM服务业PMI' },
-  'Eurozone GDP (QoQ)': { en: 'Eurozone GDP (QoQ)', zh: '欧元区国内生产总值（季率）' },
-  'Eurozone Composite PMI': { en: 'Eurozone Composite PMI', zh: '欧元区综合PMI' },
-  'China GDP (YoY)': { en: 'China GDP (YoY)', zh: '中国国内生产总值（年率）' },
-  'China Manufacturing PMI': { en: 'China Manufacturing PMI', zh: '中国制造业PMI' },
-  'BOE Interest Rate Decision': { en: 'BOE Interest Rate Decision', zh: '英国央行利率决议' },
+  'Core CPI (MoM)': { en: 'Core CPI (MoM)', zh: '核心CPI（月率）' }, 'Eurozone CPI (YoY)': { en: 'Eurozone CPI (YoY)', zh: '欧元区消费者物价指数（同比）' }, 'PBOC Loan Prime Rate (1Y)': { en: 'PBOC Loan Prime Rate (1Y)', zh: '中国贷款市场报价利率（1年期）' }, 'Fed Chair Speech': { en: 'Fed Chair Speech', zh: '美联储主席讲话' }, 'CPI (YoY)': { en: 'CPI (YoY)', zh: '消费者物价指数（同比）' }, 'Retail Sales (MoM)': { en: 'Retail Sales (MoM)', zh: '零售销售（月率）' }, 'ECB Interest Rate Decision': { en: 'ECB Interest Rate Decision', zh: '欧洲央行利率决议' }, 'ECB President Press Conference': { en: 'ECB President Press Conference', zh: '欧洲央行行长新闻发布会' }, 'Japan CPI (YoY)': { en: 'Japan CPI (YoY)', zh: '日本消费者物价指数（同比）' }, 'UK CPI (YoY)': { en: 'UK CPI (YoY)', zh: '英国消费者物价指数（同比）' }, 'UK GDP (MoM)': { en: 'UK GDP (MoM)', zh: '英国GDP（月率）' }, 'BOJ Interest Rate Decision': { en: 'BOJ Interest Rate Decision', zh: '日本央行利率决议' }, 'BOJ Governor Press Conference': { en: 'BOJ Governor Press Conference', zh: '日本央行行长新闻发布会' }, 'PPI (MoM)': { en: 'PPI (MoM)', zh: '生产者物价指数（月率）' }, 'FOMC Interest Rate Decision': { en: 'FOMC Interest Rate Decision', zh: '美联储利率决议' }, 'FOMC Press Conference': { en: 'FOMC Press Conference', zh: '美联储新闻发布会' }, 'PCE Price Index (MoM)': { en: 'PCE Price Index (MoM)', zh: '个人消费支出价格指数（月率）' }, 'Core PCE Price Index (MoM)': { en: 'Core PCE Price Index (MoM)', zh: '核心PCE价格指数（月率）' }, 'China CPI (YoY)': { en: 'China CPI (YoY)', zh: '中国消费者物价指数（同比）' }, 'China PPI (YoY)': { en: 'China PPI (YoY)', zh: '中国生产者物价指数（同比）' }, 'Nonfarm Payrolls': { en: 'Nonfarm Payrolls', zh: '非农就业' }, 'Unemployment Rate': { en: 'Unemployment Rate', zh: '失业率' }, 'GDP (Annualized QoQ)': { en: 'GDP (Annualized QoQ)', zh: 'GDP（年化季率）' }, 'ISM Manufacturing PMI': { en: 'ISM Manufacturing PMI', zh: 'ISM制造业PMI' }, 'ISM Services PMI': { en: 'ISM Services PMI', zh: 'ISM服务业PMI' }, 'Eurozone GDP (QoQ)': { en: 'Eurozone GDP (QoQ)', zh: '欧元区GDP（季率）' }, 'Eurozone Composite PMI': { en: 'Eurozone Composite PMI', zh: '欧元区综合PMI' }, 'China GDP (YoY)': { en: 'China GDP (YoY)', zh: '中国GDP（同比）' }, 'China Manufacturing PMI': { en: 'China Manufacturing PMI', zh: '中国制造业PMI' }, 'BOE Interest Rate Decision': { en: 'BOE Interest Rate Decision', zh: '英国央行利率决议' }, 'Initial Jobless Claims': { en: 'Initial Jobless Claims', zh: '首次申请失业救济人数' },
 };
 
-export function getCalendarEventLabel(event: string): BilingualLabel {
-  return calendarEventLabels[event] ?? { en: event, zh: '经济事件' };
-}
+export function getCalendarEventLabel(event: string): BilingualLabel { return calendarEventLabels[event] ?? { en: event, zh: '经济事件' }; }
 
 const keyPeopleRoleLabels: Record<string, BilingualLabel> = {
-  'Jerome Powell': { en: 'Fed Chair', zh: '美联储主席' },
-  'Jensen Huang': { en: 'NVIDIA CEO', zh: '英伟达CEO' },
-  'Elon Musk': { en: 'Tesla CEO', zh: '特斯拉CEO' },
-  'Sam Altman': { en: 'OpenAI CEO', zh: 'OpenAI首席执行官' },
-  CZ: { en: 'Crypto Executive', zh: '加密行业高管' },
-  'Donald Trump': { en: 'Policy Figure', zh: '政策人物' },
+  'Jerome Powell': { en: 'Chair, Federal Reserve', zh: '美联储主席' }, 'Jensen Huang': { en: 'NVIDIA CEO', zh: '英伟达CEO' }, 'Elon Musk': { en: 'Tesla CEO', zh: '特斯拉CEO' }, 'Sam Altman': { en: 'OpenAI CEO', zh: 'OpenAI首席执行官' }, CZ: { en: 'Crypto Executive', zh: '加密行业高管' }, 'Donald Trump': { en: 'Policy Figure', zh: '政策人物' }, 'Christine Lagarde': { en: 'President, ECB', zh: '欧洲央行行长' }, 'Kazuo Ueda': { en: 'Governor, Bank of Japan', zh: '日本央行行长' },
 };
 
-export function getKeyPersonRoleLabel(person: string, fallbackRole: string): BilingualLabel {
-  return keyPeopleRoleLabels[person] ?? { en: fallbackRole, zh: '市场相关人物' };
-}
+export function getKeyPersonRoleLabel(person: string, fallbackRole: string): BilingualLabel { return keyPeopleRoleLabels[person] ?? { en: fallbackRole, zh: '市场相关人物' }; }
+
+export const tableLabels = {
+  maturity: { en: 'Maturity', zh: '期限' }, yield: { en: 'Yield', zh: '收益率' }, oneDayChange: { en: '1D Change', zh: '单日变化' }, symbol: { en: 'Symbol', zh: '代码' }, price: { en: 'Price', zh: '价格' }, indicator: { en: 'Indicator', zh: '指标' }, latest: { en: 'Latest', zh: '最新值' }, source: { en: 'Data Source', zh: '数据源' }, status: { en: 'Status', zh: '状态' }, time: { en: 'Time', zh: '时间' }, event: { en: 'Event', zh: '事件' }, country: { en: 'Country', zh: '国家/地区' }, impact: { en: 'Impact', zh: '重要程度' },
+} satisfies Record<string, BilingualLabel>;
+
+export const statusLabels: Record<'real' | 'cache' | 'fallback' | 'mock', BilingualLabel> = { real: { en: 'Real', zh: '实时' }, cache: { en: 'Cached', zh: '缓存' }, fallback: { en: 'Fallback', zh: '备用数据' }, mock: { en: 'Mock', zh: '模拟数据' } };
+export const sessionLabels: Record<'overnight' | 'pre' | 'regular' | 'after' | 'closed', BilingualLabel> = { overnight: { en: 'OVERNIGHT', zh: '夜盘' }, pre: { en: 'PRE', zh: '盘前' }, regular: { en: 'REGULAR', zh: '正常交易' }, after: { en: 'AFTER', zh: '盘后' }, closed: { en: 'CLOSED', zh: '休市' } };

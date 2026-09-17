@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { XMLParser } from 'fast-xml-parser';
-import type { MacroQuote, TreasuryQuote } from '../../market-data';
+import type { MacroQuote, MarketDataStatus, MarketSession, TreasuryQuote } from '../../market-data';
+import { recordProviderFailure, safeConfigurationMessage, safeErrorMessage, sanitizeProviderError } from '../safe-error';
 
 type Quote = {
   symbol: string;
@@ -8,9 +9,22 @@ type Quote = {
   change: number;
   percent: number;
   updatedAt: number;
-  source: 'Yahoo Finance' | 'Finnhub' | 'US Treasury' | 'Coinbase' | '模拟数据';
+  source: string;
   dataDate?: string;
+  previousClose?: number;
+  status?: MarketDataStatus;
+  session?: MarketSession;
 };
+
+type AlpacaSnapshot = {
+  latestTrade?: { p?: number; t?: string };
+  latestQuote?: { bp?: number; ap?: number; t?: string };
+  minuteBar?: { c?: number; t?: string };
+  dailyBar?: { c?: number; t?: string };
+  prevDailyBar?: { c?: number; t?: string };
+};
+
+type AlpacaSnapshotsResponse = Record<string, AlpacaSnapshot> & { snapshots?: Record<string, AlpacaSnapshot> };
 
 type YahooChartResponse = {
   chart?: {
@@ -39,13 +53,8 @@ type CoinbaseStatsResponse = {
   last?: string;
 };
 
-type FinnhubCandleResponse = {
-  c?: Array<number | null>;
-  s?: string;
-};
-
 type HistoryRange = '1D' | '1W' | '1M' | 'YTD';
-type HistoryTask = { symbol: string; provider: 'yahoo' | 'finnhub' | 'coinbase' };
+type HistoryTask = { symbol: string; provider: 'yahoo' | 'coinbase' };
 
 type BlsResponse = {
   status?: string;
@@ -74,13 +83,20 @@ const fallbackQuotes: Record<string, Quote> = {
   '^IXIC': { symbol: '^IXIC', value: 17608.44, change: 141.85, percent: 0.81, updatedAt: 0, source: '模拟数据' },
   'GC=F': { symbol: 'GC=F', value: 2342.8, change: -8.4, percent: -0.36, updatedAt: 0, source: '模拟数据' },
   'CL=F': { symbol: 'CL=F', value: 78.65, change: 1.12, percent: 1.44, updatedAt: 0, source: '模拟数据' },
-  NVDA: { symbol: 'NVDA', value: 131.88, change: 3.74, percent: 2.92, updatedAt: 0, source: '模拟数据' },
+  NVDA: { symbol: 'NVDA', value: 131.88, change: 3.74, percent: 2.92, updatedAt: 0, source: '模拟数据', status: 'fallback', session: 'closed', previousClose: 128.14 },
   MU: { symbol: 'MU', value: 146.96, change: -2.18, percent: -1.46, updatedAt: 0, source: '模拟数据' },
   TSLA: { symbol: 'TSLA', value: 177.48, change: 4.63, percent: 2.68, updatedAt: 0, source: '模拟数据' },
   AAPL: { symbol: 'AAPL', value: 207.15, change: 0.92, percent: 0.45, updatedAt: 0, source: '模拟数据' },
+  QQQM: { symbol: 'QQQM', value: 210.24, change: 1.31, percent: 0.63, updatedAt: 0, source: '模拟数据', status: 'fallback', session: 'closed', previousClose: 208.93 },
+  SPYM: { symbol: 'SPYM', value: 67.42, change: 0.28, percent: 0.42, updatedAt: 0, source: '模拟数据', status: 'fallback', session: 'closed', previousClose: 67.14 },
+  DIA: { symbol: 'DIA', value: 427.16, change: 1.89, percent: 0.44, updatedAt: 0, source: '模拟数据', status: 'fallback', session: 'closed', previousClose: 425.27 },
+  SMH: { symbol: 'SMH', value: 248.77, change: 2.14, percent: 0.87, updatedAt: 0, source: '模拟数据', status: 'fallback', session: 'closed', previousClose: 246.63 },
+  VGT: { symbol: 'VGT', value: 682.15, change: 3.94, percent: 0.58, updatedAt: 0, source: '模拟数据', status: 'fallback', session: 'closed', previousClose: 678.21 },
+  AVGO: { symbol: 'AVGO', value: 186.68, change: 2.52, percent: 1.37, updatedAt: 0, source: '模拟数据', status: 'fallback', session: 'closed', previousClose: 184.16 },
 };
 
 const yahooSymbols = ['^GSPC', '^IXIC', '^DJI', 'GC=F', 'CL=F'];
+const alpacaSymbols = ['QQQM', 'SPYM', 'DIA', 'SMH', 'VGT', 'AVGO', 'NVDA'] as const;
 const defaultFinnhubSymbols = ['NVDA', 'MU', 'TSLA', 'AAPL'];
 const maxFinnhubSymbols = 30;
 const symbolPattern = /^[A-Z][A-Z0-9.-]{0,9}$/;
@@ -90,12 +106,14 @@ const cryptoSymbols = ['bitcoin', 'ethereum'] as const;
 type ServerCacheEntry<T> = { expiresAt: number; values: T };
 
 const quoteCache = new Map<string, ServerCacheEntry<Quote>>();
+const alpacaQuoteCache = new Map<string, ServerCacheEntry<Record<string, Quote>>>();
 const treasuryCache = new Map<string, ServerCacheEntry<Record<string, TreasuryQuote>>>();
 const cryptoCache = new Map<string, ServerCacheEntry<Record<string, Quote>>>();
 const historyCache = new Map<string, ServerCacheEntry<number[]>>();
 const historyCacheTtlMs = 60_000;
 const maxHistoryPoints = 72;
 const marketQuoteCacheTtlMs = 45_000;
+const alpacaQuoteCacheTtlMs = 8_000;
 const treasuryCacheTtlMs = 10 * 60_000;
 const cryptoCacheTtlMs = 45_000;
 const macroCache = new Map<string, ServerCacheEntry<Record<string, MacroQuote>>>();
@@ -122,7 +140,88 @@ function getFallbackQuote(symbol: string): Quote {
   const seed = [...symbol].reduce((total, character) => total + character.charCodeAt(0), 0);
   const value = 50 + (seed % 950);
   const change = ((seed % 401) - 200) / 100;
-  return { symbol, value, change, percent: (change / value) * 100, updatedAt: 0, source: '模拟数据' };
+  return { symbol, value, change, percent: (change / value) * 100, updatedAt: 0, source: '模拟数据', status: 'fallback' };
+}
+
+function newYorkSession(now = new Date()): MarketSession {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(now);
+  const readPart = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
+  const weekday = readPart('weekday');
+  if (weekday === 'Sat' || weekday === 'Sun') return 'closed';
+  const minutes = Number(readPart('hour')) * 60 + Number(readPart('minute'));
+  if (minutes >= 20 * 60 || minutes < 4 * 60) return 'overnight';
+  if (minutes < 9 * 60 + 30) return 'pre';
+  if (minutes < 16 * 60) return 'regular';
+  if (minutes < 20 * 60) return 'after';
+  return 'closed';
+}
+
+function quoteTimestamp(snapshot: AlpacaSnapshot) {
+  const timestamp = snapshot.latestTrade?.t ?? snapshot.latestQuote?.t ?? snapshot.minuteBar?.t ?? snapshot.dailyBar?.t;
+  const parsed = timestamp ? Date.parse(timestamp) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : Date.now();
+}
+
+function snapshotPrice(snapshot: AlpacaSnapshot) {
+  const bid = snapshot.latestQuote?.bp;
+  const ask = snapshot.latestQuote?.ap;
+  const midpoint = typeof bid === 'number' && typeof ask === 'number' && bid > 0 && ask > 0 ? (bid + ask) / 2 : undefined;
+  return [snapshot.latestTrade?.p, midpoint, snapshot.minuteBar?.c, snapshot.dailyBar?.c].find((value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0);
+}
+
+function markAlpacaCached(quotes: Record<string, Quote>) {
+  return Object.fromEntries(Object.entries(quotes).map(([symbol, quote]) => [symbol, { ...quote, status: 'cache' as const }]));
+}
+
+async function fetchAlpacaSnapshots(apiKey: string, secret: string): Promise<Record<string, Quote>> {
+  const session = newYorkSession();
+  const cacheKey = `alpaca:${session}`;
+  const cached = alpacaQuoteCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return markAlpacaCached(cached.values);
+
+  try {
+    const feed = session === 'overnight' ? 'overnight' : 'iex';
+    const url = new URL('https://data.alpaca.markets/v2/stocks/snapshots');
+    url.search = new URLSearchParams({ symbols: alpacaSymbols.join(','), feed }).toString();
+    const response = await fetchWithTimeout(url, {
+      cache: 'no-store',
+      headers: {
+        'APCA-API-KEY-ID': apiKey,
+        'APCA-API-SECRET-KEY': secret,
+      },
+    }, marketRequestTimeoutMs);
+    if (!response.ok) throw new Error(`Alpaca responded with ${response.status}`);
+
+    const payload = (await response.json()) as AlpacaSnapshotsResponse;
+    const snapshots = payload.snapshots ?? payload;
+    const quotes: Record<string, Quote> = {};
+    for (const symbol of alpacaSymbols) {
+      const snapshot = snapshots[symbol];
+      const value = snapshot && snapshotPrice(snapshot);
+      const previousClose = snapshot?.prevDailyBar?.c;
+      if (!snapshot || !value || typeof previousClose !== 'number' || !Number.isFinite(previousClose) || previousClose <= 0) continue;
+      const change = value - previousClose;
+      quotes[symbol] = {
+        symbol,
+        value,
+        previousClose,
+        change,
+        percent: (change / previousClose) * 100,
+        updatedAt: quoteTimestamp(snapshot),
+        source: feed === 'overnight' ? 'Alpaca Overnight' : 'Alpaca IEX',
+        status: 'real',
+        session,
+      };
+    }
+    if (!Object.keys(quotes).length) throw new Error('Alpaca returned no usable snapshot data');
+    alpacaQuoteCache.set(cacheKey, { values: quotes, expiresAt: Date.now() + alpacaQuoteCacheTtlMs });
+    return quotes;
+  } catch (error) {
+    if (cached) return markAlpacaCached(cached.values);
+    throw error;
+  }
 }
 
 const fallbackTreasuryQuotes: Record<string, TreasuryQuote> = {
@@ -184,6 +283,7 @@ async function fetchYahooQuote(symbol: string): Promise<Quote> {
       value,
       change: value - previous,
       percent: ((value - previous) / previous) * 100,
+      previousClose: previous,
       updatedAt: (meta?.regularMarketTime ?? Math.floor(Date.now() / 1000)) * 1000,
       source: 'Yahoo Finance',
     };
@@ -201,11 +301,13 @@ async function fetchFinnhubQuote(symbol: string, apiKey: string): Promise<Quote>
       throw new Error('Finnhub returned incomplete quote data');
     }
 
+    const previousClose = data.c - data.d;
     return {
       symbol,
       value: data.c,
       change: data.d,
       percent: data.dp,
+      previousClose: previousClose > 0 ? previousClose : undefined,
       updatedAt: (data.t ?? Math.floor(Date.now() / 1000)) * 1000,
       source: 'Finnhub',
     };
@@ -370,27 +472,39 @@ async function fetchMacroData(blsApiKey?: string, beaApiKey?: string) {
   const errors: string[] = [];
   const requests: Array<Promise<void>> = [];
   if (blsApiKey) {
-    requests.push(fetchBlsMacro(blsApiKey).then((values) => { Object.assign(macro, values); }).catch((error: unknown) => { errors.push(`BLS 宏观数据暂时无法获取，当前使用模拟数据（${error instanceof Error ? error.message : 'unknown error'}）`); }));
+    requests.push(fetchBlsMacro(blsApiKey).then((values) => { Object.assign(macro, values); }).catch((error: unknown) => {
+      recordProviderFailure('BLS', error);
+      errors.push(safeErrorMessage('BLS'));
+    }));
   } else {
-    errors.push('BLS API Key 尚未配置，CPI、Core CPI、非农与失业率当前使用模拟数据');
+    errors.push(safeConfigurationMessage('BLS'));
   }
   if (beaApiKey) {
-    requests.push(fetchBeaPceMacro(beaApiKey).then((values) => { Object.assign(macro, values); }).catch(() => { errors.push('BEA PCE 数据暂时无法获取，当前使用模拟数据'); }));
-    requests.push(fetchBeaGdpMacro(beaApiKey).then((values) => { Object.assign(macro, values); }).catch(() => { errors.push('BEA GDP 数据暂时无法获取，当前使用模拟数据'); }));
+    requests.push(fetchBeaPceMacro(beaApiKey).then((values) => { Object.assign(macro, values); }).catch((error: unknown) => {
+      recordProviderFailure('BEA PCE', error);
+      errors.push(safeErrorMessage('BEA PCE'));
+    }));
+    requests.push(fetchBeaGdpMacro(beaApiKey).then((values) => { Object.assign(macro, values); }).catch((error: unknown) => {
+      recordProviderFailure('BEA GDP', error);
+      errors.push(safeErrorMessage('BEA GDP'));
+    }));
   } else {
-    errors.push('BEA API Key 尚未配置，PCE、Core PCE 与 GDP 当前使用模拟数据');
+    errors.push(safeConfigurationMessage('BEA'));
   }
-  requests.push(fetchEffectiveFedFundsRate().then((values) => { Object.assign(macro, values); }).catch(() => { errors.push('Federal Reserve Board H.15 暂时无法获取，当前使用模拟数据'); }));
+  requests.push(fetchEffectiveFedFundsRate().then((values) => { Object.assign(macro, values); }).catch((error: unknown) => {
+    recordProviderFailure('Federal Reserve Board H.15', error);
+    errors.push(safeErrorMessage('Federal Reserve Board H.15'));
+  }));
   await Promise.all(requests);
   return { macro, errors };
 }
 
 function getHistoryRequest(range: HistoryRange) {
   const now = Math.floor(Date.now() / 1000);
-  if (range === '1D') return { yahooRange: '1d', yahooInterval: '5m', finnhubResolution: '5', coinbaseGranularity: 300, from: now - 86_400 };
-  if (range === '1W') return { yahooRange: '5d', yahooInterval: '30m', finnhubResolution: '30', coinbaseGranularity: 3600, from: now - 7 * 86_400 };
-  if (range === '1M') return { yahooRange: '1mo', yahooInterval: '1d', finnhubResolution: '60', coinbaseGranularity: 21_600, from: now - 31 * 86_400 };
-  return { yahooRange: 'ytd', yahooInterval: '1d', finnhubResolution: 'D', coinbaseGranularity: 86_400, from: Math.floor(Date.UTC(new Date().getUTCFullYear(), 0, 1) / 1000) };
+  if (range === '1D') return { yahooRange: '1d', yahooInterval: '5m', coinbaseGranularity: 300, from: now - 86_400 };
+  if (range === '1W') return { yahooRange: '5d', yahooInterval: '30m', coinbaseGranularity: 3600, from: now - 7 * 86_400 };
+  if (range === '1M') return { yahooRange: '1mo', yahooInterval: '1d', coinbaseGranularity: 21_600, from: now - 31 * 86_400 };
+  return { yahooRange: 'ytd', yahooInterval: '1d', coinbaseGranularity: 86_400, from: Math.floor(Date.UTC(new Date().getUTCFullYear(), 0, 1) / 1000) };
 }
 
 function sampleHistory(values: Array<number | null | undefined>) {
@@ -419,18 +533,6 @@ async function fetchYahooHistory(symbol: string, range: HistoryRange) {
   });
 }
 
-async function fetchFinnhubHistory(symbol: string, apiKey: string, range: HistoryRange) {
-  const request = getHistoryRequest(range);
-  return withHistoryCache(`finnhub:${symbol}:${range}`, async () => {
-    const url = `https://finnhub.io/api/v1/stock/candle?symbol=${encodeURIComponent(symbol)}&resolution=${request.finnhubResolution}&from=${request.from}&to=${Math.floor(Date.now() / 1000)}&token=${encodeURIComponent(apiKey)}`;
-    const response = await fetchWithTimeout(url, { cache: 'no-store' }, historyRequestTimeoutMs);
-    if (!response.ok) throw new Error(`Finnhub responded with ${response.status}`);
-    const data = (await response.json()) as FinnhubCandleResponse;
-    if (data.s !== 'ok') throw new Error('Finnhub returned no historical data');
-    return sampleHistory(data.c ?? []);
-  });
-}
-
 async function fetchCoinbaseHistory(symbol: 'bitcoin' | 'ethereum', range: HistoryRange) {
   const request = getHistoryRequest(range);
   const productId = symbol === 'bitcoin' ? 'BTC-USD' : 'ETH-USD';
@@ -450,24 +552,23 @@ async function fetchCoinbaseHistory(symbol: 'bitcoin' | 'ethereum', range: Histo
   });
 }
 
-async function fetchHistories(tasks: HistoryTask[], range: HistoryRange, finnhubKey?: string) {
+async function fetchHistories(tasks: HistoryTask[], range: HistoryRange) {
   const history: Record<string, number[]> = {};
   let nextTask = 0;
-  let failures = 0;
+  const failures: Array<{ symbol: string; provider: HistoryTask['provider']; category: string; status?: number }> = [];
   const workers = Array.from({ length: Math.min(4, tasks.length) }, async () => {
     while (nextTask < tasks.length) {
       const task = tasks[nextTask++];
       try {
         if (task.provider === 'yahoo') {
           history[task.symbol] = await fetchYahooHistory(task.symbol, range);
-        } else if (task.provider === 'finnhub') {
-          if (!finnhubKey) throw new Error('Finnhub API Key is unavailable');
-          history[task.symbol] = await fetchFinnhubHistory(task.symbol, finnhubKey, range);
         } else {
           history[task.symbol] = await fetchCoinbaseHistory(task.symbol as 'bitcoin' | 'ethereum', range);
         }
-      } catch {
-        failures += 1;
+      } catch (error) {
+        const details = sanitizeProviderError(error);
+        failures.push({ symbol: task.symbol, provider: task.provider, category: details.category, ...(details.status ? { status: details.status } : {}) });
+        recordProviderFailure(task.provider === 'yahoo' ? 'Yahoo Finance historical' : 'Coinbase historical', error, { symbol: task.symbol });
       }
     }
   });
@@ -484,65 +585,96 @@ export async function GET(request: Request) {
   const requestedRange = searchParams.get('range');
   const range: HistoryRange = requestedRange === '1W' || requestedRange === '1M' || requestedRange === 'YTD' ? requestedRange : '1D';
   const requestedSymbols = searchParams.get('symbols')?.split(',') ?? defaultFinnhubSymbols;
-  const finnhubSymbols = [...new Set(requestedSymbols.map((symbol) => symbol.trim().toUpperCase()).filter((symbol) => symbolPattern.test(symbol)))].slice(0, maxFinnhubSymbols);
+  const watchlistSymbols = [...new Set(requestedSymbols.map((symbol) => symbol.trim().toUpperCase()).filter((symbol) => symbolPattern.test(symbol)))].slice(0, maxFinnhubSymbols);
+  const equitySymbols = [...new Set([...alpacaSymbols, ...watchlistSymbols])];
 
   const finnhubKey = process.env.FINNHUB_API_KEY;
+  const alpacaKey = process.env.ALPACA_API_KEY_ID;
+  const alpacaSecret = process.env.ALPACA_API_SECRET_KEY;
   let macroResult = { macro: { ...fallbackMacro }, errors: [] as string[] };
 
   const yahooTask = Promise.all(yahooSymbols.map(async (symbol) => {
     try {
       quotes[symbol] = await fetchYahooQuote(symbol);
-    } catch {
+    } catch (error) {
       quotes[symbol] = getFallbackQuote(symbol);
-      errors.push(symbol + ' could not be loaded from Yahoo Finance');
+      recordProviderFailure('Yahoo Finance', error, { symbol });
+      errors.push(safeErrorMessage('Yahoo Finance'));
     }
   }));
 
-  const finnhubTask = !finnhubKey
-    ? Promise.resolve().then(() => {
-      finnhubSymbols.forEach((symbol) => {
-        quotes[symbol] = getFallbackQuote(symbol);
-      });
-      errors.push('Finnhub API Key is not configured; watchlist is using fallback data');
-    })
-    : Promise.all(finnhubSymbols.map(async (symbol) => {
+  const equityTask = (async () => {
+    if (alpacaKey && alpacaSecret) {
       try {
-        quotes[symbol] = await fetchFinnhubQuote(symbol, finnhubKey);
-      } catch {
-        quotes[symbol] = getFallbackQuote(symbol);
-        errors.push(symbol + ' could not be loaded from Finnhub');
+        Object.assign(quotes, await fetchAlpacaSnapshots(alpacaKey, alpacaSecret));
+      } catch (error) {
+        recordProviderFailure('Alpaca', error);
+        errors.push(safeErrorMessage('Alpaca market'));
       }
-    })).then(() => undefined);
+    } else {
+      errors.push(safeConfigurationMessage('Alpaca'));
+    }
+
+    const remainingAfterAlpaca = equitySymbols.filter((symbol) => !quotes[symbol]);
+    if (remainingAfterAlpaca.length && finnhubKey) {
+      await Promise.all(remainingAfterAlpaca.map(async (symbol) => {
+        try {
+          const quote = await fetchFinnhubQuote(symbol, finnhubKey);
+          quotes[symbol] = { ...quote, status: 'fallback', session: newYorkSession() };
+        } catch (error) {
+          recordProviderFailure('Finnhub', error, { symbol });
+        }
+      }));
+    } else if (remainingAfterAlpaca.length) {
+      errors.push(safeConfigurationMessage('Finnhub'));
+    }
+
+    const remainingAfterFinnhub = equitySymbols.filter((symbol) => !quotes[symbol]);
+    if (remainingAfterFinnhub.length) {
+      await Promise.all(remainingAfterFinnhub.map(async (symbol) => {
+        try {
+          const quote = await fetchYahooQuote(symbol);
+          quotes[symbol] = { ...quote, status: 'fallback', session: newYorkSession() };
+        } catch (error) {
+          recordProviderFailure('Yahoo Finance', error, { symbol });
+          quotes[symbol] = getFallbackQuote(symbol);
+        }
+      }));
+      if (remainingAfterFinnhub.some((symbol) => !quotes[symbol]?.updatedAt)) errors.push(safeErrorMessage('Equity market'));
+    }
+  })();
 
   const treasuryTask = fetchTreasuryQuotes()
     .then((values) => { treasury = values; })
-    .catch(() => {
+    .catch((error) => {
       treasury = fallbackTreasuryQuotes;
-      errors.push('US Treasury data is unavailable; using fallback data');
+      recordProviderFailure('US Treasury', error);
+      errors.push(safeErrorMessage('US Treasury'));
     });
 
   const cryptoTask = fetchCryptoQuotes()
     .then((values) => { crypto = values; })
-    .catch(() => {
+    .catch((error) => {
       crypto = fallbackCryptoQuotes;
-      errors.push('Coinbase BTC/ETH data is unavailable; using fallback data');
+      recordProviderFailure('Coinbase', error);
+      errors.push(safeErrorMessage('Coinbase BTC ETH'));
     });
 
   const macroTask = fetchMacroData(process.env.BLS_API_KEY, process.env.BEA_API_KEY)
     .then((result) => { macroResult = result; })
-    .catch(() => {
-      errors.push('Macro data is unavailable; using fallback data');
+    .catch((error) => {
+      recordProviderFailure('Macro', error);
+      errors.push(safeErrorMessage('Macro'));
     });
 
-  await Promise.all([yahooTask, finnhubTask, treasuryTask, cryptoTask, macroTask]);
+  await Promise.all([yahooTask, equityTask, treasuryTask, cryptoTask, macroTask]);
 
   const historyTasks: HistoryTask[] = [
-    ...yahooSymbols.filter((symbol) => quotes[symbol]?.source === 'Yahoo Finance').map((symbol) => ({ symbol, provider: 'yahoo' as const })),
-    ...finnhubSymbols.filter((symbol) => quotes[symbol]?.source === 'Finnhub').map((symbol) => ({ symbol, provider: 'finnhub' as const })),
+    ...[...new Set([...yahooSymbols, ...equitySymbols])].map((symbol) => ({ symbol, provider: 'yahoo' as const })),
     ...cryptoSymbols.filter((symbol) => crypto[symbol]?.source === 'Coinbase').map((symbol) => ({ symbol, provider: 'coinbase' as const })),
   ];
-  const { history, failures: historyFailures } = await fetchHistories(historyTasks, range, finnhubKey);
-  if (historyFailures) errors.push('Some historical data is unavailable; preserving the fallback chart');
+  const { history, failures: historyFailures } = await fetchHistories(historyTasks, range);
+  if (historyFailures.length > 0) errors.push('Some historical data is unavailable; preserving the fallback chart');
   errors.push(...macroResult.errors);
   const updatedValues = [...Object.values(quotes), ...Object.values(treasury), ...Object.values(crypto)].map((quote) => quote.updatedAt).filter(Boolean);
   return NextResponse.json({

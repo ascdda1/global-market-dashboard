@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/dca/run", "schedule": "30 22 * * 1-5" }
+  ]
+}
