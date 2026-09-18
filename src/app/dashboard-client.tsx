@@ -30,6 +30,7 @@ const overview = [
 const tickerPattern = /^[A-Z][A-Z0-9.-]{0,9}$/;
 
 function Bilingual({ label }: { label: BilingualLabel }) { return <span className="bilingual-text"><span>{label.zh}</span><small>{label.en}</small></span>; }
+function isUsableQuote(quote: ApiQuote | undefined): quote is ApiQuote { return !!quote && quote.updatedAt > 0 && !/fallback|mock|模拟/i.test(quote.source); }
 function writeWatchlistCookie(name: string, symbols: string[]) { document.cookie = `${name}=${encodeURIComponent(symbols.join(','))}; Path=/; Max-Age=31536000; SameSite=Lax`; }
 
 function MarketCard({ symbol, quote, label, range, onRange, onRemove, logoKind = 'overview', flash }: { symbol: string; quote?: ApiQuote; label?: BilingualLabel; range: Range; onRange: (range: Range) => void; onRemove?: () => void; logoKind?: AssetLogoKind; flash?: 'up' | 'down' }) {
@@ -66,24 +67,40 @@ export default function DashboardClient({ initialData }: { initialData: InitialD
       inFlight = true;
       activeController = new AbortController();
       try {
-        const response = await fetch(`/api/market/quotes?symbols=${encodeURIComponent(liveSymbolsKey)}`, { cache: 'no-store', signal: activeController.signal });
-        if (!response.ok) throw new Error('Live quote batch failed');
-        const data = await response.json() as { quotes: Record<string, ApiQuote>; fetchedAt: number };
+        const [liveResponse, overviewResponse] = await Promise.all([
+          fetch(`/api/market/quotes?symbols=${encodeURIComponent(liveSymbolsKey)}`, { cache: 'no-store', signal: activeController.signal }),
+          fetch('/api/market?overviewOnly=1', { cache: 'no-store', signal: activeController.signal }),
+        ]);
+        if (!liveResponse.ok || !overviewResponse.ok) throw new Error('Live market refresh failed');
+        const liveData = await liveResponse.json() as { quotes: Record<string, ApiQuote>; fetchedAt: number };
+        const overviewData = await overviewResponse.json() as {
+          quotes?: Record<string, ApiQuote>;
+          treasury?: Record<string, ApiQuote>;
+          crypto?: Record<string, ApiQuote>;
+          fetchedAt?: number;
+        };
         if (disposed) return;
+        const overviewQuotes: Record<string, ApiQuote> = Object.fromEntries(
+          Object.entries(overviewData.quotes ?? {}).filter(([, quote]) => isUsableQuote(quote)),
+        );
+        if (isUsableQuote(overviewData.crypto?.bitcoin)) overviewQuotes.BTC = overviewData.crypto.bitcoin;
+        if (isUsableQuote(overviewData.treasury?.US10Y)) overviewQuotes.US10Y = overviewData.treasury.US10Y;
+        const nextQuotes = { ...overviewQuotes, ...liveData.quotes };
         const changed: Record<string, 'up' | 'down'> = {};
-        for (const [symbol, quote] of Object.entries(data.quotes)) {
+        for (const [symbol, quote] of Object.entries(nextQuotes)) {
           const previous = quotesRef.current[symbol]?.value;
           if (typeof previous === 'number' && quote.value !== previous) changed[symbol] = quote.value > previous ? 'up' : 'down';
         }
-        setQuotes((current) => ({ ...current, ...data.quotes }));
+        setQuotes((current) => ({ ...current, ...nextQuotes }));
         if (Object.keys(changed).length) {
           setFlashes(changed);
           if (flashTimer.current) clearTimeout(flashTimer.current);
           flashTimer.current = setTimeout(() => setFlashes({}), 650);
         }
+        const updatedAt = Date.now();
         setLiveState('live');
-        setLastUpdated(data.fetchedAt);
-        sessionStorage.setItem(liveQuoteCacheKey, JSON.stringify({ quotes: data.quotes, updatedAt: data.fetchedAt }));
+        setLastUpdated(updatedAt);
+        sessionStorage.setItem(liveQuoteCacheKey, JSON.stringify({ quotes: nextQuotes, updatedAt }));
       } catch (error) {
         if (!disposed && !(error instanceof DOMException && error.name === 'AbortError')) setLiveState('reconnecting');
       } finally {
