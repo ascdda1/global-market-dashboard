@@ -10,14 +10,16 @@ const ttlMs = 60_000;
 const persistentHistoryTtlSeconds = 21_600;
 const symbolPattern = /^[A-Z^][A-Z0-9.^/=-]{0,14}$/;
 const fredOverviewSeries: Record<string, string> = {
-  '^GSPC': 'SP500',
-  '^IXIC': 'NASDAQCOM',
-  '^DJI': 'DJIA',
-  'GC=F': 'GOLDAMGBD228NLBM',
-  'CL=F': 'DCOILWTICO',
   US10Y: 'DGS10',
   VIX: 'VIXCLS',
 };
+const tencentOverviewSeries: Record<string, string> = {
+  '^GSPC': 'usINX',
+  '^IXIC': 'usIXIC',
+  '^DJI': 'usDJI',
+  CSI300: 'sh000300',
+};
+const yahooOverviewSeries = new Set(['GC=F', 'CL=F']);
 function normalizeBars(input: Bar[]) { const unique = new Map<number, Bar>(); for (const bar of input) if ([bar.time, bar.open, bar.high, bar.low, bar.close].every(Number.isFinite) && bar.time > 0 && bar.close > 0) unique.set(bar.time, bar); return [...unique.values()].sort((left, right) => left.time - right.time); }
 
 function rangeConfig(range: Range) {
@@ -105,6 +107,44 @@ async function fetchFredHistory(seriesId: string, range: Range): Promise<Bar[]> 
   });
 }
 
+async function fetchYahooHistory(symbol: string, range: Range): Promise<Bar[]> {
+  const config = rangeConfig(range);
+  const url = new URL(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`);
+  url.search = new URLSearchParams({
+    period1: String(Math.floor(config.start.getTime() / 1000)),
+    period2: String(Math.floor(Date.now() / 1000)),
+    interval: '1d',
+    events: 'history',
+    includeAdjustedClose: 'true',
+  }).toString();
+  const response = await timedFetch(url, { 'User-Agent': 'Mozilla/5.0 (personal-market-dashboard)' });
+  if (!response.ok) throw new Error(`Yahoo Finance responded with ${response.status}`);
+  const payload = await response.json() as {
+    chart?: {
+      result?: Array<{
+        timestamp?: number[];
+        indicators?: {
+          quote?: Array<{ open?: Array<number | null>; high?: Array<number | null>; low?: Array<number | null>; close?: Array<number | null> }>;
+        };
+      }>;
+    };
+  };
+  const result = payload.chart?.result?.[0];
+  const quote = result?.indicators?.quote?.[0];
+  const timestamps = result?.timestamp ?? [];
+  return normalizeBars(timestamps.flatMap((time, index) => {
+    const close = quote?.close?.[index];
+    if (typeof close !== 'number' || !Number.isFinite(close) || close <= 0) return [];
+    const openValue = quote?.open?.[index];
+    const highValue = quote?.high?.[index];
+    const lowValue = quote?.low?.[index];
+    const open = typeof openValue === 'number' && Number.isFinite(openValue) ? openValue : close;
+    const high = typeof highValue === 'number' && Number.isFinite(highValue) ? highValue : close;
+    const low = typeof lowValue === 'number' && Number.isFinite(lowValue) ? lowValue : close;
+    return [{ time, open, high, low, close }];
+  }));
+}
+
 async function fetchTencentIndexHistory(code: string, range: Range): Promise<Bar[]> {
   const start = rangeConfig(range).start;
   const startDate = start.toISOString().slice(0, 10);
@@ -151,6 +191,12 @@ const getCachedTencentIndexHistory = unstable_cache(
   { revalidate: persistentHistoryTtlSeconds },
 );
 
+const getCachedYahooHistory = unstable_cache(
+  async (symbol: string, range: Range) => fetchYahooHistory(symbol, range),
+  ['market-history-yahoo-v1'],
+  { revalidate: persistentHistoryTtlSeconds },
+);
+
 const getCachedAlpacaHistory = unstable_cache(
   async (rawSymbol: string, providerSymbol: string, range: Range) => {
     const apiKey = process.env.ALPACA_API_KEY_ID;
@@ -188,47 +234,64 @@ export async function GET(request: Request) {
   if (fredSeries) {
     const cacheKey = `fred:${fredSeries}:${range}`;
     const cached = cache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) return NextResponse.json({ bars: cached.bars, status: 'cache', provider: cached.provider });
+    if (cached && cached.expiresAt > Date.now()) return NextResponse.json({ bars: cached.bars, status: 'cache', provider: cached.provider, liveCompatible: true });
     try {
       const normalized = await getCachedFredHistory(fredSeries, range);
       if (normalized.length) {
         cache.set(cacheKey, { bars: normalized, expiresAt: Date.now() + ttlMs, provider: 'FRED' });
-        return NextResponse.json({ bars: normalized, status: 'real', provider: 'FRED', timeframe: '1Day' });
+        return NextResponse.json({ bars: normalized, status: 'real', provider: 'FRED', timeframe: '1Day', liveCompatible: true });
       }
     } catch {
       // fall through to cached/unavailable below
     }
-    return NextResponse.json({ bars: cached?.bars ?? [], status: cached ? 'cache' : 'unavailable', provider: cached?.provider ?? 'FRED' });
+    return NextResponse.json({ bars: cached?.bars ?? [], status: cached ? 'cache' : 'unavailable', provider: cached?.provider ?? 'FRED', liveCompatible: true });
   }
 
-  if (rawSymbol === 'CSI300') {
-    const cacheKey = `tencent:sh000300:${range}`;
+  const tencentSeries = tencentOverviewSeries[rawSymbol];
+  if (tencentSeries) {
+    const cacheKey = `tencent:${tencentSeries}:${range}`;
     const cached = cache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) return NextResponse.json({ bars: cached.bars, status: 'cache', provider: cached.provider });
+    if (cached && cached.expiresAt > Date.now()) return NextResponse.json({ bars: cached.bars, status: 'cache', provider: cached.provider, liveCompatible: true });
     try {
-      const normalized = await getCachedTencentIndexHistory('sh000300', range);
+      const normalized = await getCachedTencentIndexHistory(tencentSeries, range);
       if (normalized.length) {
         cache.set(cacheKey, { bars: normalized, expiresAt: Date.now() + ttlMs, provider: 'Tencent Finance' });
-        return NextResponse.json({ bars: normalized, status: 'real', provider: 'Tencent Finance', timeframe: '1Day' });
+        return NextResponse.json({ bars: normalized, status: 'real', provider: 'Tencent Finance', timeframe: '1Day', liveCompatible: true });
       }
     } catch {
-      // Return unavailable rather than substituting an ETF with a different price scale.
+      // Never substitute a proxy with a different price scale.
     }
-    return NextResponse.json({ bars: cached?.bars ?? [], status: cached ? 'cache' : 'unavailable', provider: cached?.provider ?? 'Tencent Finance' });
+    return NextResponse.json({ bars: cached?.bars ?? [], status: cached ? 'cache' : 'unavailable', provider: cached?.provider ?? 'Tencent Finance', liveCompatible: true });
+  }
+
+  if (yahooOverviewSeries.has(rawSymbol)) {
+    const cacheKey = `yahoo:${rawSymbol}:${range}`;
+    const cached = cache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return NextResponse.json({ bars: cached.bars, status: 'cache', provider: cached.provider, liveCompatible: true });
+    try {
+      const normalized = await getCachedYahooHistory(rawSymbol, range);
+      if (normalized.length) {
+        cache.set(cacheKey, { bars: normalized, expiresAt: Date.now() + ttlMs, provider: 'Yahoo Finance' });
+        return NextResponse.json({ bars: normalized, status: 'real', provider: 'Yahoo Finance', timeframe: '1Day', liveCompatible: true });
+      }
+    } catch {
+      // Gold/oil stay unavailable rather than falling back to a different spot-market series.
+    }
+    return NextResponse.json({ bars: cached?.bars ?? [], status: cached ? 'cache' : 'unavailable', provider: cached?.provider ?? 'Yahoo Finance', liveCompatible: true });
   }
 
   const isCrypto = rawSymbol === 'BTC' || rawSymbol === 'ETH';
   const providerSymbol = rawSymbol;
   const cacheKey = `${providerSymbol}:${range}`;
   const cached = cache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return NextResponse.json({ bars: cached.bars, status: 'cache', provider: cached.provider });
+  if (cached && cached.expiresAt > Date.now()) return NextResponse.json({ bars: cached.bars, status: 'cache', provider: cached.provider, liveCompatible: true });
 
   if (!isCrypto) {
     try {
       const normalized = await getCachedEastmoneyHistory(providerSymbol, range);
       if (normalized.length) {
         cache.set(cacheKey, { bars: normalized, expiresAt: Date.now() + ttlMs, provider: 'EastMoney' });
-        return NextResponse.json({ bars: normalized, status: 'real', provider: 'EastMoney', timeframe: '1Day' });
+        return NextResponse.json({ bars: normalized, status: 'real', provider: 'EastMoney', timeframe: '1Day', liveCompatible: true });
       }
     } catch {
       // fall through to the Alpaca fallback below
@@ -238,8 +301,8 @@ export async function GET(request: Request) {
   try {
     const normalized = await getCachedAlpacaHistory(rawSymbol, providerSymbol, range);
     cache.set(cacheKey, { bars: normalized, expiresAt: Date.now() + ttlMs, provider: 'Alpaca' });
-    return NextResponse.json({ bars: normalized, status: 'real', provider: 'Alpaca', timeframe: '1Day' });
+    return NextResponse.json({ bars: normalized, status: 'real', provider: 'Alpaca', timeframe: '1Day', liveCompatible: true });
   } catch {
-    return NextResponse.json({ bars: cached?.bars ?? [], status: cached ? 'cache' : 'unavailable', provider: cached?.provider ?? 'Alpaca' });
+    return NextResponse.json({ bars: cached?.bars ?? [], status: cached ? 'cache' : 'unavailable', provider: cached?.provider ?? 'Alpaca', liveCompatible: true });
   }
 }
