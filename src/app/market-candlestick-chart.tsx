@@ -10,23 +10,26 @@ const years: Record<LongRange, number> = { '1Y': 1, '3Y': 3, '5Y': 5, '10Y': 10 
 const historyResponses = new Map<string, HistoryPayload>();
 const historyRequests = new Map<string, Promise<HistoryPayload>>();
 
-function loadHistory(symbol: string) {
-  const cached = historyResponses.get(symbol);
+function historyKey(symbol: string, range: LongRange) { return `${symbol}:${range}`; }
+
+function loadHistory(symbol: string, range: LongRange) {
+  const key = historyKey(symbol, range);
+  const cached = historyResponses.get(key);
   if (cached) return Promise.resolve(cached);
-  const existing = historyRequests.get(symbol);
+  const existing = historyRequests.get(key);
   if (existing) return existing;
-  const request = fetch(`/api/market/history?symbol=${encodeURIComponent(symbol)}&range=10Y`)
+  const request = fetch(`/api/market/history?symbol=${encodeURIComponent(symbol)}&range=${range}`)
     .then((response) => response.ok ? response.json() as Promise<HistoryPayload> : Promise.reject(new Error('History request failed')))
     .then((data) => {
-      if (data.status !== 'unavailable' && (data.bars?.length ?? 0) > 1) historyResponses.set(symbol, data);
+      if (data.status !== 'unavailable' && (data.bars?.length ?? 0) > 1) historyResponses.set(key, data);
       return data;
     })
-    .finally(() => historyRequests.delete(symbol));
-  historyRequests.set(symbol, request);
+    .finally(() => historyRequests.delete(key));
+  historyRequests.set(key, request);
   return request;
 }
 
-export async function preloadMarketHistories(symbols: string[], concurrency = 12) {
+export async function preloadMarketHistories(symbols: string[], range: LongRange, concurrency = 12) {
   const queue = [...new Set(symbols)].filter(Boolean);
   let nextIndex = 0;
 
@@ -34,9 +37,9 @@ export async function preloadMarketHistories(symbols: string[], concurrency = 12
     while (nextIndex < queue.length) {
       const symbol = queue[nextIndex++];
       try {
-        await loadHistory(symbol);
+        await loadHistory(symbol, range);
       } catch {
-        // Individual charts will retry unavailable histories after the dashboard opens.
+        // Individual charts can retry unavailable histories later.
       }
     }
   }
@@ -54,11 +57,30 @@ function normalizeBars(input: Bar[]) {
   return [...unique.values()].sort((left, right) => left.time - right.time);
 }
 
-export default function MarketTrendChart({ symbol, range, onRange, livePrice, liveUpdatedAt }: { symbol: string; range: LongRange; onRange: (range: LongRange) => void; livePrice?: number; liveUpdatedAt?: number }) {
+export default function MarketTrendChart({ symbol, range, onRange, livePrice, liveUpdatedAt, deepHistoryReady = false }: { symbol: string; range: LongRange; onRange: (range: LongRange) => void; livePrice?: number; liveUpdatedAt?: number; deepHistoryReady?: boolean }) {
   const isTreasuryYield = symbol === 'US10Y';
   const host = useRef<HTMLDivElement>(null); const seriesRef = useRef<ISeriesApi<'Area'> | null>(null); const [visible, setVisible] = useState(false); const [bars, setBars] = useState<Bar[]>([]); const [status, setStatus] = useState<'loading' | 'real' | 'cache' | 'unavailable'>('loading'); const [liveCompatible, setLiveCompatible] = useState(true); const [hover, setHover] = useState<{ time: number; value: number } | null>(null);
   useEffect(() => { const node = host.current; if (!node) return; const observer = new IntersectionObserver(([entry]) => entry.isIntersecting && setVisible(true), { rootMargin: '160px' }); observer.observe(node); return () => observer.disconnect(); }, []);
-  useEffect(() => { if (!visible) return; let cancelled = false; setStatus('loading'); loadHistory(symbol).then((data) => { if (cancelled) return; const normalized = normalizeBars(data.bars ?? []); const closes = normalized.map((bar) => bar.close); const min = closes.length ? Math.min(...closes) : 0; const max = closes.length ? Math.max(...closes) : 0; const meaningfulVariation = normalized.length > 1 && min > 0 && (max - min) / min > 0.0001; setBars(meaningfulVariation ? normalized : []); setLiveCompatible(data.liveCompatible !== false); setStatus(meaningfulVariation ? data.status ?? 'unavailable' : 'unavailable'); }).catch(() => { if (!cancelled) { setBars([]); setLiveCompatible(false); setStatus('unavailable'); } }); return () => { cancelled = true; }; }, [symbol, visible]);
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    const requestedRange: LongRange = deepHistoryReady || range !== '1Y' ? '10Y' : '1Y';
+    setStatus('loading');
+    loadHistory(symbol, requestedRange).then((data) => {
+      if (cancelled) return;
+      const normalized = normalizeBars(data.bars ?? []);
+      const closes = normalized.map((bar) => bar.close);
+      const min = closes.length ? Math.min(...closes) : 0;
+      const max = closes.length ? Math.max(...closes) : 0;
+      const meaningfulVariation = normalized.length > 1 && min > 0 && (max - min) / min > 0.0001;
+      setBars(meaningfulVariation ? normalized : []);
+      setLiveCompatible(data.liveCompatible !== false);
+      setStatus(meaningfulVariation ? data.status ?? 'unavailable' : 'unavailable');
+    }).catch(() => {
+      if (!cancelled) { setBars([]); setLiveCompatible(false); setStatus('unavailable'); }
+    });
+    return () => { cancelled = true; };
+  }, [deepHistoryReady, range, symbol, visible]);
   const displayBars = useMemo(() => {
     if (!liveCompatible || !bars.length || typeof livePrice !== 'number' || !Number.isFinite(livePrice) || livePrice <= 0) return bars;
     const next = bars.map((bar) => ({ ...bar }));
