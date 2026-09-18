@@ -30,6 +30,7 @@ const overview = [
 const tickerPattern = /^[A-Z][A-Z0-9.-]{0,9}$/;
 
 function Bilingual({ label }: { label: BilingualLabel }) { return <span className="bilingual-text"><span>{label.zh}</span><small>{label.en}</small></span>; }
+function isUsableQuote(quote: ApiQuote | undefined): quote is ApiQuote { return !!quote && quote.updatedAt > 0 && !/fallback|mock|模拟/i.test(quote.source); }
 function writeWatchlistCookie(name: string, symbols: string[]) { document.cookie = `${name}=${encodeURIComponent(symbols.join(','))}; Path=/; Max-Age=31536000; SameSite=Lax`; }
 
 function MarketCard({ symbol, quote, label, range, onRange, onRemove, logoKind = 'overview', flash }: { symbol: string; quote?: ApiQuote; label?: BilingualLabel; range: Range; onRange: (range: Range) => void; onRemove?: () => void; logoKind?: AssetLogoKind; flash?: 'up' | 'down' }) {
@@ -79,9 +80,11 @@ export default function DashboardClient({ initialData }: { initialData: InitialD
           fetchedAt?: number;
         };
         if (disposed) return;
-        const overviewQuotes: Record<string, ApiQuote> = { ...(overviewData.quotes ?? {}) };
-        if (overviewData.crypto?.bitcoin) overviewQuotes.BTC = overviewData.crypto.bitcoin;
-        if (overviewData.treasury?.US10Y) overviewQuotes.US10Y = overviewData.treasury.US10Y;
+        const overviewQuotes: Record<string, ApiQuote> = Object.fromEntries(
+          Object.entries(overviewData.quotes ?? {}).filter(([, quote]) => isUsableQuote(quote)),
+        );
+        if (isUsableQuote(overviewData.crypto?.bitcoin)) overviewQuotes.BTC = overviewData.crypto.bitcoin;
+        if (isUsableQuote(overviewData.treasury?.US10Y)) overviewQuotes.US10Y = overviewData.treasury.US10Y;
         const nextQuotes = { ...overviewQuotes, ...liveData.quotes };
         const changed: Record<string, 'up' | 'down'> = {};
         for (const [symbol, quote] of Object.entries(nextQuotes)) {
