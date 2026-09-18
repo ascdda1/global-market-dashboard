@@ -3,6 +3,7 @@ import './globals.css';
 import './bilingual.css';
 import './dashboard-polish.css';
 import './legal-disclaimer.css';
+import './mobile-dashboard.css';
 
 export const metadata: Metadata = {
   title: 'Global Markets | 全球市场看板',
