@@ -14,18 +14,20 @@ const maxSymbols = 30;
 // Bumped to -v3 so the new default picks below (COST/WMT/PDD/NFLX/RDDT/BRK.B, RSP/SPMO/AVUV) show up
 // for this browser on next load instead of being masked by whatever was already saved under the old key.
 // Note: SpaceX has no public ticker (it's still a private company), so it isn't in this list.
-const stockKey = 'marketflow-stocks-v3';
-const etfKey = 'marketflow-etfs-v3';
+const stockKey = 'longview-stocks-v4';
+const etfKey = 'longview-etfs-v4';
 const liveQuoteCacheKey = 'marketflow-live-quotes-v1';
 const overview = [
-  { symbol: '^GSPC', en: 'S&P 500', zh: '标普500指数' },
   { symbol: '^IXIC', en: 'Nasdaq Composite', zh: '纳斯达克综合指数' },
   { symbol: '^DJI', en: 'Dow Jones Industrial Average', zh: '道琼斯工业平均指数' },
+  { symbol: '^GSPC', en: 'S&P 500', zh: '标普500指数' },
   { symbol: 'CSI300', en: 'CSI 300', zh: '沪深300指数' },
+  { symbol: '^N225', en: 'Nikkei 225', zh: '日经225指数' },
+  { symbol: '^STOXX', en: 'STOXX Europe 600', zh: '欧洲STOXX 600指数' },
   { symbol: 'GC=F', en: 'Gold', zh: '黄金' },
-  { symbol: 'CL=F', en: 'WTI Crude Oil', zh: 'WTI原油' },
-  { symbol: 'US10Y', en: 'US 10-Year Treasury Yield', zh: '美国10年期国债收益率' },
   { symbol: 'BTC', en: 'Bitcoin', zh: '比特币' },
+  { symbol: 'US10Y', en: 'US 10-Year Treasury Yield', zh: '美国10年期国债收益率' },
+  { symbol: 'CL=F', en: 'WTI Crude Oil', zh: 'WTI原油' },
 ];
 const tickerPattern = /^[A-Z][A-Z0-9.-]{0,9}$/;
 
