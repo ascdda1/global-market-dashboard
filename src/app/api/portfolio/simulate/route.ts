@@ -199,7 +199,7 @@ export async function POST(request: Request) {
       if (!id || !tickerPattern.test(symbol) || !datePattern.test(startDate)) return [];
       if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000) return [];
       if (frequency !== 'weekly' && frequency !== 'biweekly' && frequency !== 'monthly') return [];
-      if (startDate < today) return [];
+      if (startDate < '2000-01-01') return [];
       return [{ id, symbol, startDate, amount, frequency } satisfies PlanRequest];
     }).slice(0, maxPlans);
 
