@@ -6,16 +6,18 @@ import DcaChart, { type ComparisonView } from './dca-chart';
 import type { DcaSimulationResponse, DcaSimulationResult } from './simulation';
 import './dca.css';
 import LegalDisclaimer from '../legal-disclaimer';
+import PortfolioSimulator from './portfolio-simulator';
+import './portfolio-simulator.css';
 
 type AssetChoice = { symbol: string; type: 'Stock' | 'ETF' };
 type BenchmarkId = 'sp500' | 'nasdaq' | 'hang-seng' | 'csi300';
 type Unavailable = NonNullable<DcaSimulationResponse['unavailable']>[number];
 type SortKey = 'totalReturnPercent' | 'currentValue' | 'totalProfit' | 'maximumDrawdownPercent' | 'symbol';
 
-const stockKey = 'marketflow-stocks-v3';
-const etfKey = 'marketflow-etfs-v3';
-const defaultStocks = ['NVDA', 'MU', 'TSLA', 'AAPL', 'AVGO', 'MSFT', 'META', 'AMZN', 'GOOGL', 'COST', 'WMT', 'PDD', 'NFLX', 'RDDT', 'BRK.B'];
-const defaultEtfs = ['QQQM', 'SPYM', 'DIA', 'SMH', 'VGT', 'SOXX', 'SCHD', 'RSP', 'SPMO', 'AVUV'];
+const stockKey = 'longview-stocks-v4';
+const etfKey = 'longview-etfs-v4';
+const defaultStocks = ['NVDA', 'TSLA', 'AMZN', 'AVGO', 'MU', 'PDD', 'AAPL', 'MSFT', 'META', 'GOOGL', 'COST', 'NFLX', 'RDDT', 'BRK.B', 'AMD', 'INTC', 'TSM', 'MRVL'];
+const defaultEtfs = ['QQQM', 'SPYM', 'DIA', 'SMH', 'VGT', 'SOXX', 'SPMO', 'RSP', 'SCHD', 'AVUV', 'XLK', 'XLV', 'VT', 'HACK', 'VXUS', 'VYMI', 'IGV', 'FMTM'];
 const benchmarkOptions: Array<{ id: BenchmarkId; symbol: string; en: string; zh: string }> = [
   { id: 'sp500', symbol: 'SPX', en: 'S&P 500', zh: '标普500指数' },
   { id: 'nasdaq', symbol: 'IXIC', en: 'Nasdaq Composite', zh: '纳斯达克综合指数' },
@@ -103,6 +105,7 @@ export default function DcaSimulationPage() {
       {results.length > 0 && <section className="dca-panel dca-growth-panel"><div className="dca-panel-heading"><Bilingual {...dcaLabels.performanceComparison} /><div className="dca-view-toggle"><button className={view === 'normalized' ? 'active' : ''} onClick={() => setView('normalized')} type="button"><b>{dcaLabels.normalized.zh}</b><small>{dcaLabels.normalized.en}</small></button><button className={view === 'value' ? 'active' : ''} onClick={() => setView('value')} type="button"><b>{dcaLabels.portfolioValue.zh}</b><small>{dcaLabels.portfolioValue.en}</small></button></div></div><DcaChart results={results} view={view} visible={visible} onToggle={(ticker) => setVisible((current) => { const next = new Set(current); if (next.has(ticker)) next.delete(ticker); else next.add(ticker); return next; })} /><p className="dca-drawdown-note">标准化表现与最大回撤使用同一现金流调整单位净值，所有曲线从 100 开始，新增投入不会抬高表现。<br /><small>Normalized Performance uses the same contribution-adjusted unit NAV as Maximum Drawdown. Every series begins at 100.</small></p></section>}
       {detail && <section className="dca-detail"><div className="dca-result-heading"><div><span>{detail.symbol}</span><Bilingual en={detail.name === detail.symbol ? assetLabels[detail.symbol]?.en ?? detail.symbol : detail.name} zh={assetLabels[detail.symbol]?.zh ?? (detail.type === 'Benchmark' ? '市场基准' : '股票 / ETF')} /></div><p>实际开始日期<b>{detail.actualStartDate}</b><small>Actual Start Date</small></p><p>估值日期<b>{detail.valuationDate}</b><small>Valuation Date</small></p></div>{detail.historyLimited && <div className="dca-history-warning">历史数据晚于所选开始月份，实际覆盖从 <b>{detail.historicalStartDate}</b> 开始。<small>Historical data begins later than the selected start date; no synthetic prices are used.</small></div>}<div className="dca-summary-grid"><Metric {...dcaLabels.totalInvested} value={money(detail.totalInvested)} /><Metric {...dcaLabels.currentValue} value={money(detail.currentValue)} /><Metric {...dcaLabels.totalProfit} value={money(detail.totalProfit)} tone={detail.totalProfit >= 0 ? 'up' : 'down'} /><Metric {...dcaLabels.totalReturn} value={percent(detail.totalReturnPercent)} tone={detail.totalReturnPercent >= 0 ? 'up' : 'down'} /><Metric {...dcaLabels.maximumDrawdown} value={percent(detail.maximumDrawdownPercent)} tone="down" detail="Contribution-adjusted TWR" /><Metric {...dcaLabels.totalPurchases} value={String(detail.totalPurchases)} /><Metric {...dcaLabels.totalShares} value={number(detail.totalShares, 6)} /><Metric {...dcaLabels.averageCost} value={money(detail.averageCost)} /><Metric {...dcaLabels.source} value={detail.source} detail={detail.priceBasis} /></div></section>}
     </>}
+    <PortfolioSimulator supported={supported} />
     <LegalDisclaimer />
   </main>;
 }
