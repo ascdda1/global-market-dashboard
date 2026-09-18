@@ -331,9 +331,9 @@ export default function PortfolioSimulator({ supported }: { supported: AssetChoi
     <section className="portfolio-simulator" id="portfolio-simulator">
       <header className="portfolio-simulator-heading">
         <div>
-          <span className="portfolio-kicker">PORTFOLIO SIMULATOR</span>
-          <h2>持仓模拟</h2>
-          <p>输入当前仓位，并让未来定投按真实交易日收盘价自动计入模拟账户。</p>
+          <span className="portfolio-kicker">LIVE SIMULATED ACCOUNT</span>
+          <h2>账户总览</h2>
+          <p>输入当前仓位，并让未来定投按真实交易日收盘价自动计入这个独立模拟账户。</p>
           <small>Track a simulated portfolio with live P&amp;L and scheduled purchases executed at real daily closes.</small>
         </div>
         <div className="portfolio-heading-actions">
