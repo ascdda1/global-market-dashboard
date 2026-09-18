@@ -5,7 +5,7 @@ import { AreaSeries, ColorType, CrosshairMode, createChart, type ISeriesApi, typ
 
 export type LongRange = '1Y' | '3Y' | '5Y' | '10Y';
 type Bar = { time: number; open: number; high: number; low: number; close: number };
-type HistoryPayload = { bars?: Bar[]; status?: 'real' | 'cache' | 'unavailable' };
+type HistoryPayload = { bars?: Bar[]; status?: 'real' | 'cache' | 'unavailable'; provider?: string; liveCompatible?: boolean };
 const years: Record<LongRange, number> = { '1Y': 1, '3Y': 3, '5Y': 5, '10Y': 10 };
 const historyResponses = new Map<string, HistoryPayload>();
 const historyRequests = new Map<string, Promise<HistoryPayload>>();
@@ -17,7 +17,10 @@ function loadHistory(symbol: string) {
   if (existing) return existing;
   const request = fetch(`/api/market/history?symbol=${encodeURIComponent(symbol)}&range=10Y`)
     .then((response) => response.ok ? response.json() as Promise<HistoryPayload> : Promise.reject(new Error('History request failed')))
-    .then((data) => { historyResponses.set(symbol, data); return data; })
+    .then((data) => {
+      if (data.status !== 'unavailable' && (data.bars?.length ?? 0) > 1) historyResponses.set(symbol, data);
+      return data;
+    })
     .finally(() => historyRequests.delete(symbol));
   historyRequests.set(symbol, request);
   return request;
@@ -34,11 +37,11 @@ function normalizeBars(input: Bar[]) {
 }
 
 export default function MarketTrendChart({ symbol, range, onRange, livePrice, liveUpdatedAt }: { symbol: string; range: LongRange; onRange: (range: LongRange) => void; livePrice?: number; liveUpdatedAt?: number }) {
-  const host = useRef<HTMLDivElement>(null); const seriesRef = useRef<ISeriesApi<'Area'> | null>(null); const [visible, setVisible] = useState(false); const [bars, setBars] = useState<Bar[]>([]); const [status, setStatus] = useState<'loading' | 'real' | 'cache' | 'unavailable'>('loading'); const [hover, setHover] = useState<{ time: number; value: number } | null>(null);
+  const host = useRef<HTMLDivElement>(null); const seriesRef = useRef<ISeriesApi<'Area'> | null>(null); const [visible, setVisible] = useState(false); const [bars, setBars] = useState<Bar[]>([]); const [status, setStatus] = useState<'loading' | 'real' | 'cache' | 'unavailable'>('loading'); const [liveCompatible, setLiveCompatible] = useState(true); const [hover, setHover] = useState<{ time: number; value: number } | null>(null);
   useEffect(() => { const node = host.current; if (!node) return; const observer = new IntersectionObserver(([entry]) => entry.isIntersecting && setVisible(true), { rootMargin: '160px' }); observer.observe(node); return () => observer.disconnect(); }, []);
-  useEffect(() => { if (!visible) return; let cancelled = false; setStatus('loading'); loadHistory(symbol).then((data) => { if (cancelled) return; const normalized = normalizeBars(data.bars ?? []); const closes = normalized.map((bar) => bar.close); const min = closes.length ? Math.min(...closes) : 0; const max = closes.length ? Math.max(...closes) : 0; const meaningfulVariation = normalized.length > 1 && min > 0 && (max - min) / min > 0.0001; setBars(meaningfulVariation ? normalized : []); setStatus(meaningfulVariation ? data.status ?? 'unavailable' : 'unavailable'); }).catch(() => { if (!cancelled) setStatus('unavailable'); }); return () => { cancelled = true; }; }, [symbol, visible]);
+  useEffect(() => { if (!visible) return; let cancelled = false; setStatus('loading'); loadHistory(symbol).then((data) => { if (cancelled) return; const normalized = normalizeBars(data.bars ?? []); const closes = normalized.map((bar) => bar.close); const min = closes.length ? Math.min(...closes) : 0; const max = closes.length ? Math.max(...closes) : 0; const meaningfulVariation = normalized.length > 1 && min > 0 && (max - min) / min > 0.0001; setBars(meaningfulVariation ? normalized : []); setLiveCompatible(data.liveCompatible !== false); setStatus(meaningfulVariation ? data.status ?? 'unavailable' : 'unavailable'); }).catch(() => { if (!cancelled) { setBars([]); setLiveCompatible(false); setStatus('unavailable'); } }); return () => { cancelled = true; }; }, [symbol, visible]);
   const displayBars = useMemo(() => {
-    if (!bars.length || typeof livePrice !== 'number' || !Number.isFinite(livePrice) || livePrice <= 0) return bars;
+    if (!liveCompatible || !bars.length || typeof livePrice !== 'number' || !Number.isFinite(livePrice) || livePrice <= 0) return bars;
     const next = bars.map((bar) => ({ ...bar }));
     const last = next.at(-1)!;
     const quoteDate = new Date(liveUpdatedAt ?? Date.now()).toISOString().slice(0, 10);
@@ -54,7 +57,7 @@ export default function MarketTrendChart({ symbol, range, onRange, livePrice, li
       next.push({ time: Math.floor(Date.parse(`${quoteDate}T00:00:00Z`) / 1000), open: last.close, high: Math.max(last.close, livePrice), low: Math.min(last.close, livePrice), close: livePrice });
     }
     return next;
-  }, [bars, livePrice, liveUpdatedAt]);
+  }, [bars, liveCompatible, livePrice, liveUpdatedAt]);
   const analyses = useMemo(() => Object.fromEntries((Object.keys(years) as LongRange[]).map((item) => { const target = startFor(item); const subset = displayBars.filter((bar) => bar.time >= target); const first = subset[0]; const last = subset.at(-1); const gapDays = first ? (first.time - target) / 86_400 : Number.POSITIVE_INFINITY; const enough = !!first && !!last && subset.length > 1 && gapDays >= 0 && gapDays <= 14; return [item, { subset, target, gapDays, enough, value: enough ? (last!.close / first!.close - 1) * 100 : null }]; })) as Record<LongRange, { subset: Bar[]; target: number; gapDays: number; enough: boolean; value: number | null }>, [displayBars]);
   const returns = useMemo(() => Object.fromEntries((Object.keys(years) as LongRange[]).map((item) => [item, analyses[item].value])) as Record<LongRange, number | null>, [analyses]);
   const historicalShown = useMemo(() => bars.filter((bar) => bar.time >= startFor(range)), [bars, range]);
