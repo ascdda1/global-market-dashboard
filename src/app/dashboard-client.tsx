@@ -1,0 +1,101 @@
+'use client';
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { moduleLabels, assetLabels, type BilingualLabel } from './bilingual-labels';
+import type { ApiQuote } from './market-data';
+import MarketTrendChart, { type LongRange } from './market-candlestick-chart';
+import AssetLogo from './asset-logo';
+import type { AssetLogoKind } from './asset-logos';
+import BrandLogo from './brand-logo';
+import { ETF_COOKIE, STOCK_COOKIE } from './watchlist-config';
+
+type Range = LongRange;
+const maxSymbols = 30;
+// Bumped to -v3 so the new default picks below (COST/WMT/PDD/NFLX/RDDT/BRK.B, RSP/SPMO/AVUV) show up
+// for this browser on next load instead of being masked by whatever was already saved under the old key.
+// Note: SpaceX has no public ticker (it's still a private company), so it isn't in this list.
+const stockKey = 'marketflow-stocks-v3';
+const etfKey = 'marketflow-etfs-v3';
+const liveQuoteCacheKey = 'marketflow-live-quotes-v1';
+const overview = [
+  { symbol: '^GSPC', en: 'S&P 500', zh: '标普500指数' },
+  { symbol: '^IXIC', en: 'Nasdaq Composite', zh: '纳斯达克综合指数' },
+  { symbol: '^DJI', en: 'Dow Jones Industrial Average', zh: '道琼斯工业平均指数' },
+  { symbol: 'CSI300', en: 'CSI 300', zh: '沪深300指数' },
+  { symbol: 'GC=F', en: 'Gold', zh: '黄金' },
+  { symbol: 'CL=F', en: 'WTI Crude Oil', zh: 'WTI原油' },
+  { symbol: 'US10Y', en: 'US 10-Year Treasury', zh: '美国10年期国债收益率' },
+  { symbol: 'BTC', en: 'Bitcoin', zh: '比特币' },
+];
+const tickerPattern = /^[A-Z][A-Z0-9.-]{0,9}$/;
+
+function Bilingual({ label }: { label: BilingualLabel }) { return <span className="bilingual-text"><span>{label.zh}</span><small>{label.en}</small></span>; }
+function writeWatchlistCookie(name: string, symbols: string[]) { document.cookie = `${name}=${encodeURIComponent(symbols.join(','))}; Path=/; Max-Age=31536000; SameSite=Lax`; }
+
+function MarketCard({ symbol, quote, label, range, onRange, onRemove, logoKind = 'overview', flash }: { symbol: string; quote?: ApiQuote; label?: BilingualLabel; range: Range; onRange: (range: Range) => void; onRemove?: () => void; logoKind?: AssetLogoKind; flash?: 'up' | 'down' }) {
+  const real = quote?.status === 'real' || (!!quote?.updatedAt && !/fallback|mock|模拟/i.test(quote.source));
+  const unavailable = !quote;
+  const value = quote ? quote.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'Unavailable';
+  const change = quote ? `${quote.change >= 0 ? '+' : ''}${quote.change.toFixed(2)}` : '—';
+  const percent = quote ? `${quote.percent >= 0 ? '+' : ''}${quote.percent.toFixed(2)}%` : '—';
+  const resolved = label ?? assetLabels[symbol] ?? { en: symbol, zh: '美股／ETF' };
+  return <article className={`market-card trading-card${flash ? ` quote-flash-${flash}` : ''}`}><div className="card-topline"><div className="card-title-group"><AssetLogo ticker={symbol} kind={logoKind} /><div className="card-label"><h3>{resolved.zh}</h3><p>{resolved.en}</p></div></div><div className="card-right"><div className="card-badges-row"><span className="ticker-badge">{symbol}</span>{onRemove && <button className="watch-button" aria-label={`Remove ${symbol}`} onClick={onRemove} type="button">×</button>}</div><div className="card-quote"><strong>{value}</strong><div className={`change ${(quote?.change ?? 0) >= 0 ? 'up' : 'down'}`}>{change} <em>{percent}</em></div></div></div></div><div className="quote-meta"><span className={`source-badge ${real ? 'real' : unavailable ? 'unavailable' : 'fallback'}`}>{real ? 'Real' : unavailable ? 'Unavailable' : 'Fallback'}</span><span>{quote?.source ?? 'Alpaca unavailable'}</span><span>{quote?.updatedAt ? new Date(quote.updatedAt).toLocaleTimeString('en-GB') : '—'}</span></div><MarketTrendChart symbol={symbol} range={range} onRange={onRange} livePrice={quote?.value} liveUpdatedAt={quote?.updatedAt} /></article>;
+}
+
+function WatchSection({ id, title, symbols, input, setInput, add, remove, quotes, range, onRange, logoKind, flashes }: { id: string; title: BilingualLabel; symbols: string[]; input: string; setInput: (value: string) => void; add: (event: React.FormEvent) => void; remove: (symbol: string) => void; quotes: Record<string, ApiQuote>; range: Range; onRange: (range: Range) => void; logoKind: Exclude<AssetLogoKind, 'overview'>; flashes: Record<string, 'up' | 'down'> }) {
+  return <section className="watchlist-section" id={id}><div className="compact-section-heading"><Bilingual label={title} /><span>{symbols.length}/{maxSymbols}</span><form className="watchlist-tools" onSubmit={add}><input aria-label={`Add ${title.en}`} maxLength={10} onChange={(event) => setInput(event.target.value)} placeholder="Add ticker" value={input} /><button type="submit">Add</button></form></div><div className="market-grid watchlist-grid">{symbols.map((symbol) => <MarketCard key={symbol} symbol={symbol} quote={quotes[symbol]} range={range} onRange={onRange} onRemove={() => remove(symbol)} logoKind={logoKind} flash={flashes[symbol]} />)}</div></section>;
+}
+
+export type InitialDashboardData = { stocks: string[]; etfs: string[]; quotes: Record<string, ApiQuote>; fetchedAt: number | null };
+
+export default function DashboardClient({ initialData }: { initialData: InitialDashboardData }) {
+  const [stocks, setStocks] = useState(initialData.stocks); const [etfs, setEtfs] = useState(initialData.etfs); const [stockInput, setStockInput] = useState(''); const [etfInput, setEtfInput] = useState(''); const [quotes, setQuotes] = useState<Record<string, ApiQuote>>(initialData.quotes); const [range, setRange] = useState<Range>('1Y'); const [sidebarOpen, setSidebarOpen] = useState(false); const [liveState, setLiveState] = useState<'connecting' | 'live' | 'reconnecting'>(initialData.fetchedAt ? 'live' : 'connecting'); const [lastUpdated, setLastUpdated] = useState<number | null>(initialData.fetchedAt); const [flashes, setFlashes] = useState<Record<string, 'up' | 'down'>>({}); const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null); const quotesRef = useRef<Record<string, ApiQuote>>(initialData.quotes);
+  const liveSymbols = useMemo(() => [...new Set([...stocks, ...etfs])].slice(0, 60), [stocks, etfs]);
+  const liveSymbolsKey = liveSymbols.join(',');
+  useEffect(() => { localStorage.setItem(stockKey, JSON.stringify(stocks)); writeWatchlistCookie(STOCK_COOKIE, stocks); }, [stocks]);
+  useEffect(() => { localStorage.setItem(etfKey, JSON.stringify(etfs)); writeWatchlistCookie(ETF_COOKIE, etfs); }, [etfs]);
+  useEffect(() => { quotesRef.current = quotes; }, [quotes]);
+  useEffect(() => { try { const cached = JSON.parse(sessionStorage.getItem(liveQuoteCacheKey) ?? 'null') as { quotes?: Record<string, ApiQuote>; updatedAt?: number } | null; if (cached?.quotes && !initialData.fetchedAt) setQuotes((current) => ({ ...cached.quotes, ...current })); if (cached?.updatedAt && !initialData.fetchedAt) setLastUpdated(cached.updatedAt); } catch { /* Ignore corrupt browser cache. */ } }, [initialData.fetchedAt]);
+  useEffect(() => {
+    if (!liveSymbolsKey) return;
+    let disposed = false;
+    let inFlight = false;
+    let activeController: AbortController | null = null;
+    const poll = async () => {
+      if (disposed || inFlight) return;
+      inFlight = true;
+      activeController = new AbortController();
+      try {
+        const response = await fetch(`/api/market/quotes?symbols=${encodeURIComponent(liveSymbolsKey)}`, { cache: 'no-store', signal: activeController.signal });
+        if (!response.ok) throw new Error('Live quote batch failed');
+        const data = await response.json() as { quotes: Record<string, ApiQuote>; fetchedAt: number };
+        if (disposed) return;
+        const changed: Record<string, 'up' | 'down'> = {};
+        for (const [symbol, quote] of Object.entries(data.quotes)) {
+          const previous = quotesRef.current[symbol]?.value;
+          if (typeof previous === 'number' && quote.value !== previous) changed[symbol] = quote.value > previous ? 'up' : 'down';
+        }
+        setQuotes((current) => ({ ...current, ...data.quotes }));
+        if (Object.keys(changed).length) {
+          setFlashes(changed);
+          if (flashTimer.current) clearTimeout(flashTimer.current);
+          flashTimer.current = setTimeout(() => setFlashes({}), 650);
+        }
+        setLiveState('live');
+        setLastUpdated(data.fetchedAt);
+        sessionStorage.setItem(liveQuoteCacheKey, JSON.stringify({ quotes: data.quotes, updatedAt: data.fetchedAt }));
+      } catch (error) {
+        if (!disposed && !(error instanceof DOMException && error.name === 'AbortError')) setLiveState('reconnecting');
+      } finally {
+        inFlight = false;
+      }
+    };
+    setLiveState((current) => current === 'live' ? current : 'connecting');
+    const interval = window.setInterval(() => void poll(), 3_000);
+    return () => { disposed = true; window.clearInterval(interval); activeController?.abort(); };
+  }, [liveSymbolsKey]);
+  useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current); }, []);
+  const add = (kind: 'stock' | 'etf') => (event: React.FormEvent) => { event.preventDefault(); const value = (kind === 'stock' ? stockInput : etfInput).trim().toUpperCase(); const list = kind === 'stock' ? stocks : etfs; if (!tickerPattern.test(value) || list.includes(value) || list.length >= maxSymbols) return; if (kind === 'stock') { setStocks([...list, value]); setStockInput(''); } else { setEtfs([...list, value]); setEtfInput(''); } };
+  const nav: Array<[string, string, BilingualLabel]> = [['#overview', '▦', moduleLabels.overview], ['#stocks', '⌁', moduleLabels.stocks], ['#etfs', '▤', moduleLabels.etfs], ['/dca', '◫', moduleLabels.dcaSimulation]];
+  return <main className="app-shell"><aside className={`sidebar${sidebarOpen ? ' mobile-open' : ''}`}><div className="brand"><div className="brand-mark"><BrandLogo /></div><div><strong>全球市场</strong><small>Global Market<br />长期主义，少即是多。</small></div></div><nav>{nav.map(([href, icon, label]) => <a className={`nav-item${href === '#overview' ? ' active' : ''}`} href={href} key={href} onClick={() => setSidebarOpen(false)}><span className="nav-icon">{icon}</span><Bilingual label={label} /></a>)}</nav></aside>{sidebarOpen && <button aria-label="Close navigation" className="mobile-sidebar-scrim" onClick={() => setSidebarOpen(false)} type="button" />}<section className="content"><section className="primary-markets" id="overview"><div className="section-kicker"><button className="mobile-nav-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} type="button">☰</button><span>◈</span> <Bilingual label={moduleLabels.marketOverview} /><div className={`live-quote-status ${liveState}`}><span className="live-dot" /><span><b>{liveState === 'reconnecting' ? '连接中' : '实时行情'}</b><small>{liveState === 'reconnecting' ? 'Reconnecting' : 'Live · 3s'}</small></span><time><b>最后更新</b><small>{lastUpdated ? new Date(lastUpdated).toLocaleTimeString('en-GB') : '—'}</small></time></div></div><div className="primary-market-grid">{overview.map((item) => <MarketCard key={item.symbol} symbol={item.symbol} quote={quotes[item.symbol]} label={item} range={range} onRange={setRange} />)}</div></section><WatchSection id="stocks" title={{ en: 'My Stocks', zh: '我的股票' }} symbols={stocks} input={stockInput} setInput={setStockInput} add={add('stock')} remove={(symbol) => setStocks(stocks.filter((item) => item !== symbol))} quotes={quotes} range={range} onRange={setRange} logoKind="stock" flashes={flashes} /><WatchSection id="etfs" title={{ en: 'My ETFs', zh: '我的 ETF' }} symbols={etfs} input={etfInput} setInput={setEtfInput} add={add('etf')} remove={(symbol) => setEtfs(etfs.filter((item) => item !== symbol))} quotes={quotes} range={range} onRange={setRange} logoKind="etf" flashes={flashes} /><footer><span>Global Market Dashboard</span><span>Charts powered by TradingView Lightweight Charts</span><span>Alpaca Market Data</span></footer></section></main>;
+}

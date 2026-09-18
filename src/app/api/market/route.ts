@@ -54,7 +54,7 @@ type CoinbaseStatsResponse = {
 };
 
 type HistoryRange = '1D' | '1W' | '1M' | 'YTD';
-type HistoryTask = { symbol: string; provider: 'yahoo' | 'coinbase' };
+type HistoryTask = { symbol: string; provider: 'alpaca' | 'fallback' };
 
 type BlsResponse = {
   status?: string;
@@ -96,6 +96,7 @@ const fallbackQuotes: Record<string, Quote> = {
 };
 
 const yahooSymbols = ['^GSPC', '^IXIC', '^DJI', 'GC=F', 'CL=F'];
+const tencentSymbols = ['usINX', 'usIXIC', 'usDJI', 's_sh000300', 'hf_GC', 'hf_CL'] as const;
 const alpacaSymbols = ['QQQM', 'SPYM', 'DIA', 'SMH', 'VGT', 'AVGO', 'NVDA'] as const;
 const defaultFinnhubSymbols = ['NVDA', 'MU', 'TSLA', 'AAPL'];
 const maxFinnhubSymbols = 30;
@@ -118,8 +119,10 @@ const treasuryCacheTtlMs = 10 * 60_000;
 const cryptoCacheTtlMs = 45_000;
 const macroCache = new Map<string, ServerCacheEntry<Record<string, MacroQuote>>>();
 const macroCacheTtlMs = 45 * 60_000;
+const tencentEquityQuoteCache = new Map<string, ServerCacheEntry<Record<string, Quote>>>();
+const tencentEquityQuoteCacheTtlMs = 15_000;
 const marketRequestTimeoutMs = 4_000;
-const officialDataTimeoutMs = 7_000;
+const officialDataTimeoutMs = 4_000;
 const historyRequestTimeoutMs = 5_000;
 
 const fallbackMacro: Record<string, MacroQuote> = {
@@ -175,16 +178,16 @@ function markAlpacaCached(quotes: Record<string, Quote>) {
   return Object.fromEntries(Object.entries(quotes).map(([symbol, quote]) => [symbol, { ...quote, status: 'cache' as const }]));
 }
 
-async function fetchAlpacaSnapshots(apiKey: string, secret: string): Promise<Record<string, Quote>> {
+async function fetchAlpacaSnapshots(apiKey: string, secret: string, symbols: string[] = [...alpacaSymbols]): Promise<Record<string, Quote>> {
   const session = newYorkSession();
-  const cacheKey = `alpaca:${session}`;
+  const cacheKey = `alpaca:${session}:${[...symbols].sort().join(',')}`;
   const cached = alpacaQuoteCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return markAlpacaCached(cached.values);
 
   try {
     const feed = session === 'overnight' ? 'overnight' : 'iex';
     const url = new URL('https://data.alpaca.markets/v2/stocks/snapshots');
-    url.search = new URLSearchParams({ symbols: alpacaSymbols.join(','), feed }).toString();
+    url.search = new URLSearchParams({ symbols: symbols.join(','), feed }).toString();
     const response = await fetchWithTimeout(url, {
       cache: 'no-store',
       headers: {
@@ -197,7 +200,7 @@ async function fetchAlpacaSnapshots(apiKey: string, secret: string): Promise<Rec
     const payload = (await response.json()) as AlpacaSnapshotsResponse;
     const snapshots = payload.snapshots ?? payload;
     const quotes: Record<string, Quote> = {};
-    for (const symbol of alpacaSymbols) {
+    for (const symbol of symbols) {
       const snapshot = snapshots[symbol];
       const value = snapshot && snapshotPrice(snapshot);
       const previousClose = snapshot?.prevDailyBar?.c;
@@ -246,6 +249,56 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, tim
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function fetchTencentOverview(): Promise<Record<string, Quote>> {
+  const response = await fetchWithTimeout(`https://qt.gtimg.cn/q=${tencentSymbols.join(',')}`, { cache: 'no-store' }, marketRequestTimeoutMs);
+  if (!response.ok) throw new Error(`Tencent Finance responded with ${response.status}`);
+  const text = await response.text();
+  const output: Record<string, Quote> = {};
+  const aliases: Record<string, string> = { usINX: '^GSPC', usIXIC: '^IXIC', usDJI: '^DJI', s_sh000300: 'CSI300', hf_GC: 'GC=F', hf_CL: 'CL=F' };
+  for (const sourceSymbol of tencentSymbols) {
+    const match = text.match(new RegExp(`v_${sourceSymbol}="([^"]*)"`));
+    if (!match) continue;
+    const target = aliases[sourceSymbol];
+    if (sourceSymbol.startsWith('hf_')) {
+      const fields = match[1].split(','); const value = Number(fields[0]); const percent = Number(fields[1]); const previous = value / (1 + percent / 100); const change = value - previous;
+      if (Number.isFinite(value) && Number.isFinite(change)) output[target] = { symbol: target, value, change, percent, updatedAt: Date.parse(`${fields[12]}T${fields[6]}Z`) || Date.now(), source: 'Tencent Finance', status: 'real' };
+    } else {
+      const fields = match[1].split('~'); const value = Number(fields[3]); const change = sourceSymbol === 's_sh000300' ? Number(fields[4]) : Number(fields[31]); const percent = sourceSymbol === 's_sh000300' ? Number(fields[5]) : Number(fields[32]);
+      if (Number.isFinite(value) && Number.isFinite(change)) output[target] = { symbol: target, value, change, percent, updatedAt: sourceSymbol === 's_sh000300' ? Date.now() : Date.parse(fields[30]) || Date.now(), source: 'Tencent Finance', status: 'real' };
+    }
+  }
+  return output;
+}
+
+// Tencent's plain-text quote endpoint (qt.gtimg.cn) is mainland-China-hosted and much faster to reach
+// than Alpaca (US-hosted) for users browsing from China. It supports individual US-listed tickers via
+// the same "us" + SYMBOL code convention already used for the index/futures overview above. We try it
+// first for the user's own watchlist and only fall back to Alpaca for whatever symbols it can't cover,
+// so quotes usually load without waiting on a transpacific round trip at all.
+async function fetchTencentEquityQuotes(symbols: string[]): Promise<Record<string, Quote>> {
+  if (!symbols.length) return {};
+  const cacheKey = [...symbols].sort().join(',');
+  return withServerCache(tencentEquityQuoteCache, cacheKey, tencentEquityQuoteCacheTtlMs, async () => {
+    const codes = symbols.map((symbol) => `us${symbol}`);
+    const response = await fetchWithTimeout(`https://qt.gtimg.cn/q=${codes.join(',')}`, { cache: 'no-store' }, marketRequestTimeoutMs);
+    if (!response.ok) throw new Error(`Tencent Finance responded with ${response.status}`);
+    const text = await response.text();
+    const output: Record<string, Quote> = {};
+    for (const symbol of symbols) {
+      const match = text.match(new RegExp(`v_us${symbol}="([^"]*)"`));
+      if (!match || !match[1]) continue;
+      const fields = match[1].split('~');
+      const value = Number(fields[3]);
+      const change = Number(fields[31]);
+      const percent = Number(fields[32]);
+      if (![value, change, percent].every(Number.isFinite) || value <= 0) continue;
+      output[symbol] = { symbol, value, change, percent, updatedAt: Date.parse(fields[30]) || Date.now(), source: 'Tencent Finance', status: 'real' };
+    }
+    if (!Object.keys(output).length) throw new Error('Tencent Finance returned no usable equity quote data');
+    return output;
+  });
 }
 
 async function withServerCache<T>(cache: Map<string, ServerCacheEntry<T>>, key: string, ttlMs: number, fetcher: () => Promise<T>) {
@@ -340,32 +393,21 @@ async function fetchTreasuryQuotes(): Promise<Record<string, TreasuryQuote>> {
   });
 }
 
-async function fetchCryptoQuotes(): Promise<Record<string, Quote>> {
-  return withServerCache(cryptoCache, 'coinbase:stats', cryptoCacheTtlMs, async () => {
-  const quotes = await Promise.all(cryptoSymbols.map(async (symbol) => {
-    const productId = symbol === 'bitcoin' ? 'BTC-USD' : 'ETH-USD';
-    const response = await fetchWithTimeout(`https://api.exchange.coinbase.com/products/${productId}/stats`, { cache: 'no-store' }, marketRequestTimeoutMs);
-    if (!response.ok) throw new Error(`Coinbase responded with ${response.status}`);
-
-    const data = (await response.json()) as CoinbaseStatsResponse;
-    const value = Number(data.last);
-    const open = Number(data.open);
-    if (!Number.isFinite(value) || !Number.isFinite(open) || value <= 0 || open <= 0) {
-      throw new Error('Coinbase returned incomplete data');
+async function fetchAlpacaCryptoQuotes(apiKey: string, secret: string): Promise<Record<string, Quote>> {
+  return withServerCache(cryptoCache, 'alpaca:crypto', cryptoCacheTtlMs, async () => {
+    const response = await fetchWithTimeout('https://data.alpaca.markets/v1beta3/crypto/us/latest/bars?symbols=BTC%2FUSD%2CETH%2FUSD', { cache: 'no-store', headers: { 'APCA-API-KEY-ID': apiKey, 'APCA-API-SECRET-KEY': secret } }, marketRequestTimeoutMs);
+    if (!response.ok) throw new Error(`Alpaca crypto responded with ${response.status}`);
+    const payload = await response.json() as { bars?: Record<string, { c?: number; t?: string; o?: number }> };
+    const bars = payload.bars ?? {};
+    const result: Record<string, Quote> = {};
+    for (const [key, symbol] of [['BTC/USD', 'bitcoin'], ['ETH/USD', 'ethereum']] as const) {
+      const bar = bars[key];
+      if (!bar || typeof bar.c !== 'number' || typeof bar.o !== 'number' || bar.o <= 0) continue;
+      const change = bar.c - bar.o;
+      result[symbol] = { symbol: symbol === 'bitcoin' ? 'BTC' : 'ETH', value: bar.c, change, percent: (change / bar.o) * 100, updatedAt: bar.t ? Date.parse(bar.t) : Date.now(), source: 'Alpaca Crypto', status: 'real' };
     }
-
-    const change = value - open;
-    return [symbol, {
-      symbol: symbol === 'bitcoin' ? 'BTC' : 'ETH',
-      value,
-      change,
-      percent: (change / open) * 100,
-      updatedAt: Date.now(),
-      source: 'Coinbase',
-    }] as const;
-  }));
-
-  return Object.fromEntries(quotes);
+    if (Object.keys(result).length !== 2) throw new Error('Alpaca crypto returned incomplete data');
+    return result;
   });
 }
 
@@ -467,18 +509,10 @@ async function fetchEffectiveFedFundsRate() {
   });
 }
 
-async function fetchMacroData(blsApiKey?: string, beaApiKey?: string) {
+async function fetchMacroData(beaApiKey?: string) {
   const macro: Record<string, MacroQuote> = { ...fallbackMacro };
   const errors: string[] = [];
   const requests: Array<Promise<void>> = [];
-  if (blsApiKey) {
-    requests.push(fetchBlsMacro(blsApiKey).then((values) => { Object.assign(macro, values); }).catch((error: unknown) => {
-      recordProviderFailure('BLS', error);
-      errors.push(safeErrorMessage('BLS'));
-    }));
-  } else {
-    errors.push(safeConfigurationMessage('BLS'));
-  }
   if (beaApiKey) {
     requests.push(fetchBeaPceMacro(beaApiKey).then((values) => { Object.assign(macro, values); }).catch((error: unknown) => {
       recordProviderFailure('BEA PCE', error);
@@ -491,10 +525,7 @@ async function fetchMacroData(blsApiKey?: string, beaApiKey?: string) {
   } else {
     errors.push(safeConfigurationMessage('BEA'));
   }
-  requests.push(fetchEffectiveFedFundsRate().then((values) => { Object.assign(macro, values); }).catch((error: unknown) => {
-    recordProviderFailure('Federal Reserve Board H.15', error);
-    errors.push(safeErrorMessage('Federal Reserve Board H.15'));
-  }));
+  errors.push('Effective Federal Funds Rate unavailable; fallback data used');
   await Promise.all(requests);
   return { macro, errors };
 }
@@ -533,6 +564,34 @@ async function fetchYahooHistory(symbol: string, range: HistoryRange) {
   });
 }
 
+async function fetchAlpacaHistory(symbol: string, range: HistoryRange, apiKey: string, secret: string) {
+  const request = getHistoryRequest(range);
+  return withHistoryCache(`alpaca:${symbol}:${range}`, async () => {
+    const timeframe = range === '1D' ? '5Min' : range === '1W' ? '30Min' : '1D';
+    const start = new Date(request.from * 1000).toISOString();
+    const url = new URL('https://data.alpaca.markets/v2/stocks/bars');
+    url.search = new URLSearchParams({ symbols: symbol, timeframe, start, limit: '1000', feed: 'iex' }).toString();
+    const response = await fetchWithTimeout(url, { cache: 'no-store', headers: { 'APCA-API-KEY-ID': apiKey, 'APCA-API-SECRET-KEY': secret } }, historyRequestTimeoutMs);
+    if (!response.ok) throw new Error(`Alpaca historical responded with ${response.status}`);
+    const payload = await response.json() as { bars?: Record<string, Array<{ c?: number }>> };
+    return sampleHistory((payload.bars?.[symbol] ?? []).map((bar) => bar.c));
+  });
+}
+
+async function fetchAlpacaCryptoHistory(symbol: 'bitcoin' | 'ethereum', range: HistoryRange, apiKey: string, secret: string) {
+  const request = getHistoryRequest(range);
+  return withHistoryCache(`alpaca-crypto:${symbol}:${range}`, async () => {
+    const product = symbol === 'bitcoin' ? 'BTC/USD' : 'ETH/USD';
+    const timeframe = range === '1D' ? '5Min' : range === '1W' ? '1Hour' : '1Day';
+    const url = new URL('https://data.alpaca.markets/v1beta3/crypto/us/bars');
+    url.search = new URLSearchParams({ symbols: product, timeframe, start: new Date(request.from * 1000).toISOString(), limit: '1000' }).toString();
+    const response = await fetchWithTimeout(url, { cache: 'no-store', headers: { 'APCA-API-KEY-ID': apiKey, 'APCA-API-SECRET-KEY': secret } }, historyRequestTimeoutMs);
+    if (!response.ok) throw new Error(`Alpaca crypto historical responded with ${response.status}`);
+    const payload = await response.json() as { bars?: Record<string, Array<{ c?: number }>> };
+    return sampleHistory((payload.bars?.[product] ?? []).map((bar) => bar.c));
+  });
+}
+
 async function fetchCoinbaseHistory(symbol: 'bitcoin' | 'ethereum', range: HistoryRange) {
   const request = getHistoryRequest(range);
   const productId = symbol === 'bitcoin' ? 'BTC-USD' : 'ETH-USD';
@@ -552,7 +611,7 @@ async function fetchCoinbaseHistory(symbol: 'bitcoin' | 'ethereum', range: Histo
   });
 }
 
-async function fetchHistories(tasks: HistoryTask[], range: HistoryRange) {
+async function fetchHistories(tasks: HistoryTask[], range: HistoryRange, apiKey?: string, secret?: string) {
   const history: Record<string, number[]> = {};
   let nextTask = 0;
   const failures: Array<{ symbol: string; provider: HistoryTask['provider']; category: string; status?: number }> = [];
@@ -560,15 +619,11 @@ async function fetchHistories(tasks: HistoryTask[], range: HistoryRange) {
     while (nextTask < tasks.length) {
       const task = tasks[nextTask++];
       try {
-        if (task.provider === 'yahoo') {
-          history[task.symbol] = await fetchYahooHistory(task.symbol, range);
-        } else {
-          history[task.symbol] = await fetchCoinbaseHistory(task.symbol as 'bitcoin' | 'ethereum', range);
-        }
+        if (task.provider === 'alpaca' && apiKey && secret) history[task.symbol] = task.symbol === 'bitcoin' || task.symbol === 'ethereum' ? await fetchAlpacaCryptoHistory(task.symbol, range, apiKey, secret) : await fetchAlpacaHistory(task.symbol, range, apiKey, secret);
       } catch (error) {
         const details = sanitizeProviderError(error);
         failures.push({ symbol: task.symbol, provider: task.provider, category: details.category, ...(details.status ? { status: details.status } : {}) });
-        recordProviderFailure(task.provider === 'yahoo' ? 'Yahoo Finance historical' : 'Coinbase historical', error, { symbol: task.symbol });
+        recordProviderFailure('Alpaca historical', error, { symbol: task.symbol });
       }
     }
   });
@@ -582,66 +637,44 @@ export async function GET(request: Request) {
   let crypto: Record<string, Quote> = {};
   const errors: string[] = [];
   const searchParams = new URL(request.url).searchParams;
+  const overviewOnly = searchParams.get('overviewOnly') === '1';
   const requestedRange = searchParams.get('range');
   const range: HistoryRange = requestedRange === '1W' || requestedRange === '1M' || requestedRange === 'YTD' ? requestedRange : '1D';
   const requestedSymbols = searchParams.get('symbols')?.split(',') ?? defaultFinnhubSymbols;
   const watchlistSymbols = [...new Set(requestedSymbols.map((symbol) => symbol.trim().toUpperCase()).filter((symbol) => symbolPattern.test(symbol)))].slice(0, maxFinnhubSymbols);
   const equitySymbols = [...new Set([...alpacaSymbols, ...watchlistSymbols])];
 
-  const finnhubKey = process.env.FINNHUB_API_KEY;
   const alpacaKey = process.env.ALPACA_API_KEY_ID;
   const alpacaSecret = process.env.ALPACA_API_SECRET_KEY;
   let macroResult = { macro: { ...fallbackMacro }, errors: [] as string[] };
 
-  const yahooTask = Promise.all(yahooSymbols.map(async (symbol) => {
+  const overviewTask = fetchTencentOverview().then((values) => { Object.assign(quotes, values); }).catch((error) => {
+    recordProviderFailure('Tencent Finance', error);
+    errors.push(safeErrorMessage('Global market overview'));
+  });
+
+  const equityTask = overviewOnly ? Promise.resolve() : (async () => {
     try {
-      quotes[symbol] = await fetchYahooQuote(symbol);
+      Object.assign(quotes, await fetchTencentEquityQuotes(equitySymbols));
     } catch (error) {
-      quotes[symbol] = getFallbackQuote(symbol);
-      recordProviderFailure('Yahoo Finance', error, { symbol });
-      errors.push(safeErrorMessage('Yahoo Finance'));
+      recordProviderFailure('Tencent Finance (equities)', error);
     }
-  }));
 
-  const equityTask = (async () => {
-    if (alpacaKey && alpacaSecret) {
-      try {
-        Object.assign(quotes, await fetchAlpacaSnapshots(alpacaKey, alpacaSecret));
-      } catch (error) {
-        recordProviderFailure('Alpaca', error);
-        errors.push(safeErrorMessage('Alpaca market'));
+    const missingSymbols = equitySymbols.filter((symbol) => !quotes[symbol]);
+    if (missingSymbols.length) {
+      if (alpacaKey && alpacaSecret) {
+        try {
+          Object.assign(quotes, await fetchAlpacaSnapshots(alpacaKey, alpacaSecret, missingSymbols));
+        } catch (error) {
+          recordProviderFailure('Alpaca', error);
+          errors.push(safeErrorMessage('Alpaca market'));
+        }
+      } else {
+        errors.push(safeConfigurationMessage('Alpaca'));
       }
-    } else {
-      errors.push(safeConfigurationMessage('Alpaca'));
     }
 
-    const remainingAfterAlpaca = equitySymbols.filter((symbol) => !quotes[symbol]);
-    if (remainingAfterAlpaca.length && finnhubKey) {
-      await Promise.all(remainingAfterAlpaca.map(async (symbol) => {
-        try {
-          const quote = await fetchFinnhubQuote(symbol, finnhubKey);
-          quotes[symbol] = { ...quote, status: 'fallback', session: newYorkSession() };
-        } catch (error) {
-          recordProviderFailure('Finnhub', error, { symbol });
-        }
-      }));
-    } else if (remainingAfterAlpaca.length) {
-      errors.push(safeConfigurationMessage('Finnhub'));
-    }
-
-    const remainingAfterFinnhub = equitySymbols.filter((symbol) => !quotes[symbol]);
-    if (remainingAfterFinnhub.length) {
-      await Promise.all(remainingAfterFinnhub.map(async (symbol) => {
-        try {
-          const quote = await fetchYahooQuote(symbol);
-          quotes[symbol] = { ...quote, status: 'fallback', session: newYorkSession() };
-        } catch (error) {
-          recordProviderFailure('Yahoo Finance', error, { symbol });
-          quotes[symbol] = getFallbackQuote(symbol);
-        }
-      }));
-      if (remainingAfterFinnhub.some((symbol) => !quotes[symbol]?.updatedAt)) errors.push(safeErrorMessage('Equity market'));
-    }
+    for (const symbol of equitySymbols) if (!quotes[symbol]) quotes[symbol] = getFallbackQuote(symbol);
   })();
 
   const treasuryTask = fetchTreasuryQuotes()
@@ -649,39 +682,26 @@ export async function GET(request: Request) {
     .catch((error) => {
       treasury = fallbackTreasuryQuotes;
       recordProviderFailure('US Treasury', error);
-      errors.push(safeErrorMessage('US Treasury'));
+      errors.push(safeErrorMessage('US Treasury yields'));
     });
 
-  const cryptoTask = fetchCryptoQuotes()
+  const cryptoTask = alpacaKey && alpacaSecret ? fetchAlpacaCryptoQuotes(alpacaKey, alpacaSecret)
     .then((values) => { crypto = values; })
     .catch((error) => {
       crypto = fallbackCryptoQuotes;
-      recordProviderFailure('Coinbase', error);
-      errors.push(safeErrorMessage('Coinbase BTC ETH'));
-    });
+      recordProviderFailure('Alpaca Crypto', error);
+      errors.push(safeErrorMessage('Alpaca Crypto BTC ETH'));
+    }) : Promise.resolve().then(() => { crypto = fallbackCryptoQuotes; errors.push(safeConfigurationMessage('Alpaca')); });
 
-  const macroTask = fetchMacroData(process.env.BLS_API_KEY, process.env.BEA_API_KEY)
-    .then((result) => { macroResult = result; })
-    .catch((error) => {
-      recordProviderFailure('Macro', error);
-      errors.push(safeErrorMessage('Macro'));
-    });
+  await Promise.all([overviewTask, equityTask, treasuryTask, cryptoTask]);
 
-  await Promise.all([yahooTask, equityTask, treasuryTask, cryptoTask, macroTask]);
-
-  const historyTasks: HistoryTask[] = [
-    ...[...new Set([...yahooSymbols, ...equitySymbols])].map((symbol) => ({ symbol, provider: 'yahoo' as const })),
-    ...cryptoSymbols.filter((symbol) => crypto[symbol]?.source === 'Coinbase').map((symbol) => ({ symbol, provider: 'coinbase' as const })),
-  ];
-  const { history, failures: historyFailures } = await fetchHistories(historyTasks, range);
-  if (historyFailures.length > 0) errors.push('Some historical data is unavailable; preserving the fallback chart');
   errors.push(...macroResult.errors);
   const updatedValues = [...Object.values(quotes), ...Object.values(treasury), ...Object.values(crypto)].map((quote) => quote.updatedAt).filter(Boolean);
   return NextResponse.json({
     quotes,
     treasury,
     crypto,
-    history,
+    history: {},
     macro: macroResult.macro,
     errors,
     fetchedAt: updatedValues.length ? Math.max(...updatedValues) : Date.now(),
