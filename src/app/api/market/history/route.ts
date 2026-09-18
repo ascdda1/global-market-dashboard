@@ -243,14 +243,7 @@ export async function GET(request: Request) {
     }
     if (rawSymbol === 'US10Y') {
       try {
-        const tnx = await getCachedYahooHistory('^TNX', range);
-        const normalized = normalizeBars(tnx.map((bar) => ({
-          ...bar,
-          open: bar.open / 10,
-          high: bar.high / 10,
-          low: bar.low / 10,
-          close: bar.close / 10,
-        })));
+        const normalized = await getCachedYahooHistory('^TNX', range);
         if (normalized.length) {
           return NextResponse.json({ bars: normalized, status: 'real', provider: 'Yahoo Finance ^TNX', timeframe: '1Day', liveCompatible: false });
         }
