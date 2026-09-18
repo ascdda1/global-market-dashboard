@@ -26,6 +26,24 @@ function loadHistory(symbol: string) {
   return request;
 }
 
+export async function preloadMarketHistories(symbols: string[], concurrency = 12) {
+  const queue = [...new Set(symbols)].filter(Boolean);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < queue.length) {
+      const symbol = queue[nextIndex++];
+      try {
+        await loadHistory(symbol);
+      } catch {
+        // Individual charts will retry unavailable histories after the dashboard opens.
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, queue.length || 1) }, () => worker()));
+}
+
 function startFor(range: LongRange) { const date = new Date(); date.setUTCFullYear(date.getUTCFullYear() - years[range]); return Math.floor(date.getTime() / 1000); }
 function normalizeBars(input: Bar[]) {
   const unique = new Map<number, Bar>();
