@@ -649,9 +649,21 @@ export async function GET(request: Request) {
   const alpacaSecret = process.env.ALPACA_API_SECRET_KEY;
   let macroResult = { macro: { ...fallbackMacro }, errors: [] as string[] };
 
-  const overviewTask = fetchTencentOverview().then((values) => { Object.assign(quotes, values); }).catch((error) => {
-    recordProviderFailure('Tencent Finance', error);
-    errors.push(safeErrorMessage('Global market overview'));
+  const overviewTask = Promise.allSettled([
+    fetchTencentOverview(),
+    fetchYahooQuote('^N225'),
+    fetchYahooQuote('^STOXX'),
+  ]).then((results) => {
+    const [tencentResult, nikkeiResult, europeResult] = results;
+    if (tencentResult.status === 'fulfilled') Object.assign(quotes, tencentResult.value);
+    else {
+      recordProviderFailure('Tencent Finance', tencentResult.reason);
+      errors.push(safeErrorMessage('Global market overview'));
+    }
+    if (nikkeiResult.status === 'fulfilled') quotes['^N225'] = nikkeiResult.value;
+    else recordProviderFailure('Yahoo Finance Nikkei 225', nikkeiResult.reason);
+    if (europeResult.status === 'fulfilled') quotes['^STOXX'] = europeResult.value;
+    else recordProviderFailure('Yahoo Finance STOXX Europe 600', europeResult.reason);
   });
 
   const equityTask = overviewOnly ? Promise.resolve() : (async () => {

@@ -1,9 +1,9 @@
 export const MAX_WATCHLIST_SYMBOLS = 30;
-export const STOCK_COOKIE = 'marketflow_stocks';
-export const ETF_COOKIE = 'marketflow_etfs';
+export const STOCK_COOKIE = 'longview_stocks_v2';
+export const ETF_COOKIE = 'longview_etfs_v2';
 
-export const DEFAULT_STOCKS = ['NVDA', 'MU', 'TSLA', 'AAPL', 'AVGO', 'MSFT', 'META', 'AMZN', 'GOOGL', 'COST', 'WMT', 'PDD', 'NFLX', 'RDDT', 'BRK.B'];
-export const DEFAULT_ETFS = ['QQQM', 'SPYM', 'DIA', 'SMH', 'VGT', 'SOXX', 'SCHD', 'RSP', 'SPMO', 'AVUV'];
+export const DEFAULT_STOCKS = ['NVDA', 'TSLA', 'AMZN', 'AVGO', 'MU', 'PDD', 'AAPL', 'MSFT', 'META', 'GOOGL', 'COST', 'NFLX', 'RDDT', 'BRK.B', 'AMD', 'INTC', 'TSM', 'MRVL'];
+export const DEFAULT_ETFS = ['QQQM', 'SPYM', 'DIA', 'SMH', 'VGT', 'SOXX', 'SPMO', 'RSP', 'SCHD', 'AVUV', 'XLK', 'XLV', 'VT', 'HACK', 'VXUS', 'VYMI', 'IGV', 'FMTM'];
 
 const tickerPattern = /^[A-Z][A-Z0-9.-]{0,9}$/;
 
