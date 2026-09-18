@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { moduleLabels, assetLabels, type BilingualLabel } from './bilingual-labels';
 import type { ApiQuote } from './market-data';
-import MarketTrendChart, { type LongRange } from './market-candlestick-chart';
+import MarketTrendChart, { preloadMarketHistories, type LongRange } from './market-candlestick-chart';
 import AssetLogo from './asset-logo';
 import type { AssetLogoKind } from './asset-logos';
 import BrandLogo from './brand-logo';
@@ -71,12 +71,23 @@ function WatchSection({ id, title, symbols, input, setInput, add, remove, quotes
 export type InitialDashboardData = { stocks: string[]; etfs: string[]; quotes: Record<string, ApiQuote>; fetchedAt: number | null };
 
 export default function DashboardClient({ initialData }: { initialData: InitialDashboardData }) {
-  const [stocks, setStocks] = useState(initialData.stocks); const [etfs, setEtfs] = useState(initialData.etfs); const [stockInput, setStockInput] = useState(''); const [etfInput, setEtfInput] = useState(''); const [quotes, setQuotes] = useState<Record<string, ApiQuote>>(initialData.quotes); const [range, setRange] = useState<Range>('1Y'); const [sidebarOpen, setSidebarOpen] = useState(false); const [liveState, setLiveState] = useState<'connecting' | 'live' | 'reconnecting'>(initialData.fetchedAt ? 'live' : 'connecting'); const [lastUpdated, setLastUpdated] = useState<number | null>(initialData.fetchedAt); const [flashes, setFlashes] = useState<Record<string, 'up' | 'down'>>({}); const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null); const quotesRef = useRef<Record<string, ApiQuote>>(initialData.quotes);
+  const [stocks, setStocks] = useState(initialData.stocks); const [etfs, setEtfs] = useState(initialData.etfs); const [stockInput, setStockInput] = useState(''); const [etfInput, setEtfInput] = useState(''); const [quotes, setQuotes] = useState<Record<string, ApiQuote>>(initialData.quotes); const [range, setRange] = useState<Range>('1Y'); const [sidebarOpen, setSidebarOpen] = useState(false); const [liveState, setLiveState] = useState<'connecting' | 'live' | 'reconnecting'>(initialData.fetchedAt ? 'live' : 'connecting'); const [lastUpdated, setLastUpdated] = useState<number | null>(initialData.fetchedAt); const [flashes, setFlashes] = useState<Record<string, 'up' | 'down'>>({}); const [historyReady, setHistoryReady] = useState(false); const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null); const quotesRef = useRef<Record<string, ApiQuote>>(initialData.quotes);
   const liveSymbols = useMemo(() => [...new Set([...stocks, ...etfs])].slice(0, 60), [stocks, etfs]);
   const liveSymbolsKey = liveSymbols.join(',');
+  const initialHistorySymbols = useRef([...new Set([...overview.map((item) => item.symbol), ...initialData.stocks, ...initialData.etfs])].slice(0, 68));
   useEffect(() => { localStorage.setItem(stockKey, JSON.stringify(stocks)); writeWatchlistCookie(STOCK_COOKIE, stocks); }, [stocks]);
   useEffect(() => { localStorage.setItem(etfKey, JSON.stringify(etfs)); writeWatchlistCookie(ETF_COOKIE, etfs); }, [etfs]);
   useEffect(() => { quotesRef.current = quotes; }, [quotes]);
+  useEffect(() => {
+    let cancelled = false;
+    const timeout = window.setTimeout(() => { if (!cancelled) setHistoryReady(true); }, 15_000);
+    void preloadMarketHistories(initialHistorySymbols.current).finally(() => {
+      if (cancelled) return;
+      window.clearTimeout(timeout);
+      setHistoryReady(true);
+    });
+    return () => { cancelled = true; window.clearTimeout(timeout); };
+  }, []);
   useEffect(() => { try { const cached = JSON.parse(sessionStorage.getItem(liveQuoteCacheKey) ?? 'null') as { quotes?: Record<string, ApiQuote>; updatedAt?: number } | null; if (cached?.quotes && !initialData.fetchedAt) setQuotes((current) => ({ ...cached.quotes, ...current })); if (cached?.updatedAt && !initialData.fetchedAt) setLastUpdated(cached.updatedAt); } catch { /* Ignore corrupt browser cache. */ } }, [initialData.fetchedAt]);
   useEffect(() => {
     if (!liveSymbolsKey) return;
@@ -133,6 +144,10 @@ export default function DashboardClient({ initialData }: { initialData: InitialD
     return () => { disposed = true; window.clearInterval(interval); activeController?.abort(); };
   }, [liveSymbolsKey]);
   useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current); }, []);
+  if (!historyReady) {
+    return <main className="dashboard-bootstrap"><div className="dashboard-bootstrap-card"><BrandLogo /><strong>Longview Terminal</strong><span>正在准备市场数据与长期走势</span><small>Loading market data and long-term charts…</small><i /></div></main>;
+  }
+
   const add = (kind: 'stock' | 'etf') => (event: React.FormEvent) => { event.preventDefault(); const value = (kind === 'stock' ? stockInput : etfInput).trim().toUpperCase(); const list = kind === 'stock' ? stocks : etfs; if (!tickerPattern.test(value) || list.includes(value) || list.length >= maxSymbols) return; if (kind === 'stock') { setStocks([...list, value]); setStockInput(''); } else { setEtfs([...list, value]); setEtfInput(''); } };
   const nav: Array<[string, string, BilingualLabel]> = [['#overview', '▦', moduleLabels.overview], ['#stocks', '⌁', moduleLabels.stocks], ['#etfs', '▤', moduleLabels.etfs], ['/dca', '◫', moduleLabels.dcaSimulation]];
   return <main className="app-shell"><aside className={`sidebar${sidebarOpen ? ' mobile-open' : ''}`}><div className="brand"><div className="brand-mark"><BrandLogo /></div><div><strong>全球市场</strong><small>Global Market<br />长期主义，少即是多。</small></div></div><nav>{nav.map(([href, icon, label]) => <a className={`nav-item${href === '#overview' ? ' active' : ''}`} href={href} key={href} onClick={() => setSidebarOpen(false)}><span className="nav-icon">{icon}</span><Bilingual label={label} /></a>)}</nav></aside>{sidebarOpen && <button aria-label="Close navigation" className="mobile-sidebar-scrim" onClick={() => setSidebarOpen(false)} type="button" />}<section className="content"><section className="primary-markets" id="overview"><div className="section-kicker"><button className="mobile-nav-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} type="button">☰</button><span>◈</span> <Bilingual label={moduleLabels.marketOverview} /><div className={`live-quote-status ${liveState}`}><span className="live-dot" /><span><b>{liveState === 'reconnecting' ? '连接中' : '实时行情'}</b><small>{liveState === 'reconnecting' ? 'Reconnecting' : 'Live · 3s'}</small></span><time><b>最后更新</b><small>{lastUpdated ? new Date(lastUpdated).toLocaleTimeString('en-GB') : '—'}</small></time></div></div><div className="primary-market-grid">{overview.map((item) => <MarketCard key={item.symbol} symbol={item.symbol} quote={quotes[item.symbol]} label={item} range={range} onRange={setRange} />)}</div></section><WatchSection id="stocks" title={{ en: 'My Stocks', zh: '我的股票' }} symbols={stocks} input={stockInput} setInput={setStockInput} add={add('stock')} remove={(symbol) => setStocks(stocks.filter((item) => item !== symbol))} quotes={quotes} range={range} onRange={setRange} logoKind="stock" flashes={flashes} /><WatchSection id="etfs" title={{ en: 'My ETFs', zh: '我的 ETF' }} symbols={etfs} input={etfInput} setInput={setEtfInput} add={add('etf')} remove={(symbol) => setEtfs(etfs.filter((item) => item !== symbol))} quotes={quotes} range={range} onRange={setRange} logoKind="etf" flashes={flashes} /><footer><span>Global Market Dashboard</span><span>Charts powered by TradingView Lightweight Charts</span><span>Alpaca Market Data</span></footer></section></main>;
