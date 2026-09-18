@@ -239,3 +239,36 @@ footer { display: flex; justify-content: space-between; gap: 15px; margin-top: 2
   .dashboard-information-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .market-grid, .macro-detail-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+
+.dashboard-bootstrap {
+  align-items: center;
+  background: #111417;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+.dashboard-bootstrap-card {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 420px;
+  text-align: center;
+}
+.dashboard-bootstrap-card svg { height: 54px; width: 54px; }
+.dashboard-bootstrap-card strong { color: var(--text); font-size: 28px; letter-spacing: .02em; }
+.dashboard-bootstrap-card span { color: #d8dee8; font-size: 15px; }
+.dashboard-bootstrap-card small { color: var(--muted); font-size: 12px; }
+.dashboard-bootstrap-card i {
+  animation: bootstrap-spin .9s linear infinite;
+  border: 2px solid #303844;
+  border-radius: 50%;
+  border-top-color: var(--amber);
+  display: block;
+  height: 24px;
+  margin-top: 8px;
+  width: 24px;
+}
+@keyframes bootstrap-spin { to { transform: rotate(360deg); } }
