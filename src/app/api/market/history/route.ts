@@ -239,7 +239,24 @@ export async function GET(request: Request) {
         return NextResponse.json({ bars: normalized, status: 'real', provider: 'FRED', timeframe: '1Day', liveCompatible: true });
       }
     } catch {
-      // fall through to cached/unavailable below
+      // US10Y gets a market-yield fallback below; other FRED series continue to unavailable.
+    }
+    if (rawSymbol === 'US10Y') {
+      try {
+        const tnx = await getCachedYahooHistory('^TNX', range);
+        const normalized = normalizeBars(tnx.map((bar) => ({
+          ...bar,
+          open: bar.open / 10,
+          high: bar.high / 10,
+          low: bar.low / 10,
+          close: bar.close / 10,
+        })));
+        if (normalized.length) {
+          return NextResponse.json({ bars: normalized, status: 'real', provider: 'Yahoo Finance ^TNX', timeframe: '1Day', liveCompatible: false });
+        }
+      } catch {
+        // Keep the official-data failure visible instead of fabricating a flat line.
+      }
     }
     return NextResponse.json({ bars: cached?.bars ?? [], status: cached ? 'cache' : 'unavailable', provider: cached?.provider ?? 'FRED', liveCompatible: true });
   }
