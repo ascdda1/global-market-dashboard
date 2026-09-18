@@ -14,12 +14,9 @@ const fredOverviewSeries: Record<string, string> = {
   VIX: 'VIXCLS',
 };
 const tencentOverviewSeries: Record<string, string> = {
-  '^GSPC': 'usINX',
-  '^IXIC': 'usIXIC',
-  '^DJI': 'usDJI',
   CSI300: 'sh000300',
 };
-const yahooOverviewSeries = new Set(['GC=F', 'CL=F']);
+const yahooOverviewSeries = new Set(['^GSPC', '^IXIC', '^DJI', 'GC=F', 'CL=F']);
 function normalizeBars(input: Bar[]) { const unique = new Map<number, Bar>(); for (const bar of input) if ([bar.time, bar.open, bar.high, bar.low, bar.close].every(Number.isFinite) && bar.time > 0 && bar.close > 0) unique.set(bar.time, bar); return [...unique.values()].sort((left, right) => left.time - right.time); }
 
 function rangeConfig(range: Range) {
