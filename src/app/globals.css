@@ -272,3 +272,52 @@ footer { display: flex; justify-content: space-between; gap: 15px; margin-top: 2
   width: 24px;
 }
 @keyframes bootstrap-spin { to { transform: rotate(360deg); } }
+
+
+.project-demo-notice {
+  display: grid;
+  gap: 3px;
+  margin: 10px 0 2px;
+  padding: 8px 10px;
+  border: 1px solid #5f4a21;
+  border-radius: 7px;
+  color: #e7c77d;
+  background: #211c14;
+  line-height: 1.25;
+}
+.project-demo-notice > span {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .01em;
+}
+.project-demo-notice > small {
+  color: #a9905f;
+  font-size: 9px;
+}
+.project-demo-notice.compact {
+  max-width: 420px;
+  margin: 1px 0 3px;
+  padding: 7px 10px;
+  text-align: center;
+}
+.project-demo-notice.compact > span { font-size: 11px; }
+.project-demo-notice.compact > small { font-size: 9px; }
+
+@media (min-width: 701px) {
+  .content > .project-demo-notice {
+    margin: 8px 0 0;
+  }
+}
+
+@media (max-width: 700px) {
+  .project-demo-notice {
+    margin: 9px 0 0;
+    padding: 8px 9px;
+    border-radius: 9px;
+  }
+  .project-demo-notice > span { font-size: 11px; }
+  .project-demo-notice > small { font-size: 8px; line-height: 1.35; }
+  .dashboard-bootstrap-card .project-demo-notice {
+    width: min(100%, 360px);
+  }
+}
