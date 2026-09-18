@@ -34,13 +34,34 @@ function isUsableQuote(quote: ApiQuote | undefined): quote is ApiQuote { return 
 function writeWatchlistCookie(name: string, symbols: string[]) { document.cookie = `${name}=${encodeURIComponent(symbols.join(','))}; Path=/; Max-Age=31536000; SameSite=Lax`; }
 
 function MarketCard({ symbol, quote, label, range, onRange, onRemove, logoKind = 'overview', flash }: { symbol: string; quote?: ApiQuote; label?: BilingualLabel; range: Range; onRange: (range: Range) => void; onRemove?: () => void; logoKind?: AssetLogoKind; flash?: 'up' | 'down' }) {
+  const isTreasuryYield = symbol === 'US10Y';
   const real = quote?.status === 'real' || (!!quote?.updatedAt && !/fallback|mock|模拟/i.test(quote.source));
   const unavailable = !quote;
-  const value = quote ? quote.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'Unavailable';
-  const change = quote ? `${quote.change >= 0 ? '+' : ''}${quote.change.toFixed(2)}` : '—';
-  const percent = quote ? `${quote.percent >= 0 ? '+' : ''}${quote.percent.toFixed(2)}%` : '—';
+  const value = quote
+    ? isTreasuryYield
+      ? `${quote.value.toFixed(2)}%`
+      : quote.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : 'Unavailable';
+  const change = quote
+    ? isTreasuryYield
+      ? `${quote.change >= 0 ? '+' : ''}${(quote.change * 100).toFixed(0)} bp`
+      : `${quote.change >= 0 ? '+' : ''}${quote.change.toFixed(2)}`
+    : '—';
+  const secondaryChange = quote
+    ? isTreasuryYield
+      ? '较上一交易日'
+      : `${quote.percent >= 0 ? '+' : ''}${quote.percent.toFixed(2)}%`
+    : '—';
   const resolved = label ?? assetLabels[symbol] ?? { en: symbol, zh: '美股／ETF' };
-  return <article className={`market-card trading-card${flash ? ` quote-flash-${flash}` : ''}`}><div className="card-topline"><div className="card-title-group"><AssetLogo ticker={symbol} kind={logoKind} /><div className="card-label"><h3>{resolved.zh}</h3><p>{resolved.en}</p></div></div><div className="card-right"><div className="card-badges-row"><span className="ticker-badge">{symbol}</span>{onRemove && <button className="watch-button" aria-label={`Remove ${symbol}`} onClick={onRemove} type="button">×</button>}</div><div className="card-quote"><strong>{value}</strong><div className={`change ${(quote?.change ?? 0) >= 0 ? 'up' : 'down'}`}>{change} <em>{percent}</em></div></div></div></div><div className="quote-meta"><span className={`source-badge ${real ? 'real' : unavailable ? 'unavailable' : 'fallback'}`}>{real ? 'Real' : unavailable ? 'Unavailable' : 'Fallback'}</span><span>{quote?.source ?? 'Alpaca unavailable'}</span><span>{quote?.updatedAt ? new Date(quote.updatedAt).toLocaleTimeString('en-GB') : '—'}</span></div><MarketTrendChart symbol={symbol} range={range} onRange={onRange} livePrice={quote?.value} liveUpdatedAt={quote?.updatedAt} /></article>;
+  const statusText = isTreasuryYield && real ? '官方日频' : real ? 'Real' : unavailable ? 'Unavailable' : 'Fallback';
+  const sourceText = quote?.source ?? (isTreasuryYield ? 'US Treasury unavailable' : 'Alpaca unavailable');
+  const timeText = isTreasuryYield
+    ? quote?.dataDate ?? '—'
+    : quote?.updatedAt
+      ? new Date(quote.updatedAt).toLocaleTimeString('en-GB')
+      : '—';
+
+  return <article className={`market-card trading-card${flash ? ` quote-flash-${flash}` : ''}`}><div className="card-topline"><div className="card-title-group"><AssetLogo ticker={symbol} kind={logoKind} /><div className="card-label"><h3>{resolved.zh}</h3><p>{resolved.en}</p></div></div><div className="card-right"><div className="card-badges-row"><span className="ticker-badge">{symbol}</span>{onRemove && <button className="watch-button" aria-label={`Remove ${symbol}`} onClick={onRemove} type="button">×</button>}</div><div className="card-quote"><strong>{value}</strong><div className={`change ${(quote?.change ?? 0) >= 0 ? 'up' : 'down'}`}>{change} <em>{secondaryChange}</em></div></div></div></div><div className="quote-meta"><span className={`source-badge ${real ? 'real' : unavailable ? 'unavailable' : 'fallback'}`}>{statusText}</span><span>{sourceText}</span><span>{timeText}</span></div><MarketTrendChart symbol={symbol} range={range} onRange={onRange} livePrice={quote?.value} liveUpdatedAt={quote?.updatedAt} /></article>;
 }
 
 function WatchSection({ id, title, symbols, input, setInput, add, remove, quotes, range, onRange, logoKind, flashes }: { id: string; title: BilingualLabel; symbols: string[]; input: string; setInput: (value: string) => void; add: (event: React.FormEvent) => void; remove: (symbol: string) => void; quotes: Record<string, ApiQuote>; range: Range; onRange: (range: Range) => void; logoKind: Exclude<AssetLogoKind, 'overview'>; flashes: Record<string, 'up' | 'down'> }) {
