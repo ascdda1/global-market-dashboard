@@ -384,6 +384,7 @@ async function fetchTreasuryQuotes(): Promise<Record<string, TreasuryQuote>> {
   const [latest, previous] = rows;
   return Object.fromEntries(treasurySymbols.map((symbol) => [symbol, {
     value: latest.values[symbol],
+    previousClose: previous.values[symbol],
     change: latest.values[symbol] - previous.values[symbol],
     percent: 0,
     source: 'US Treasury',
