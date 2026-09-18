@@ -24,7 +24,7 @@ const overview = [
   { symbol: 'CSI300', en: 'CSI 300', zh: '沪深300指数' },
   { symbol: 'GC=F', en: 'Gold', zh: '黄金' },
   { symbol: 'CL=F', en: 'WTI Crude Oil', zh: 'WTI原油' },
-  { symbol: 'US10Y', en: 'US 10-Year Treasury', zh: '美国10年期国债收益率' },
+  { symbol: 'US10Y', en: 'US 10-Year Treasury Yield', zh: '美国10年期国债收益率' },
   { symbol: 'BTC', en: 'Bitcoin', zh: '比特币' },
 ];
 const tickerPattern = /^[A-Z][A-Z0-9.-]{0,9}$/;
