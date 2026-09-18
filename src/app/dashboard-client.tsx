@@ -11,9 +11,7 @@ import { ETF_COOKIE, STOCK_COOKIE } from './watchlist-config';
 
 type Range = LongRange;
 const maxSymbols = 30;
-// Bumped to -v3 so the new default picks below (COST/WMT/PDD/NFLX/RDDT/BRK.B, RSP/SPMO/AVUV) show up
-// for this browser on next load instead of being masked by whatever was already saved under the old key.
-// Note: SpaceX has no public ticker (it's still a private company), so it isn't in this list.
+// Versioned storage keys let a new curated default layout replace the previous saved defaults once.
 const stockKey = 'longview-stocks-v4';
 const etfKey = 'longview-etfs-v4';
 const liveQuoteCacheKey = 'marketflow-live-quotes-v1';
