@@ -32,6 +32,14 @@ const overview = [
 const tickerPattern = /^[A-Z][A-Z0-9.-]{0,9}$/;
 
 function Bilingual({ label }: { label: BilingualLabel }) { return <span className="bilingual-text"><span>{label.zh}</span><small>{label.en}</small></span>; }
+function ProjectDemoNotice({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className={`project-demo-notice${compact ? ' compact' : ''}`} role="note">
+      <span>金融数据看板 Demo · 仅供个人学习、研究与功能验证使用</span>
+      <small>Financial dashboard demo · For personal learning, research and functional validation only</small>
+    </div>
+  );
+}
 function isUsableQuote(quote: ApiQuote | undefined): quote is ApiQuote { return !!quote && quote.updatedAt > 0 && !/fallback|mock|模拟/i.test(quote.source); }
 function writeWatchlistCookie(name: string, symbols: string[]) { document.cookie = `${name}=${encodeURIComponent(symbols.join(','))}; Path=/; Max-Age=31536000; SameSite=Lax`; }
 
@@ -181,7 +189,7 @@ export default function DashboardClient({ initialData }: { initialData: InitialD
   }, [liveSymbolsKey]);
   useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current); }, []);
   if (mobileMode === null || !historyReady) {
-    return <main className="dashboard-bootstrap"><div className="dashboard-bootstrap-card"><BrandLogo /><strong>Longview Terminal</strong><span>正在准备市场数据与长期走势</span><small>Loading market data and long-term charts…</small><i /></div></main>;
+    return <main className="dashboard-bootstrap"><div className="dashboard-bootstrap-card"><BrandLogo /><strong>Longview Terminal</strong><ProjectDemoNotice compact /><span>正在准备市场数据与长期走势</span><small>Loading market data and long-term charts…</small><i /></div></main>;
   }
 
   const add = (kind: 'stock' | 'etf') => (event: React.FormEvent) => { event.preventDefault(); const value = (kind === 'stock' ? stockInput : etfInput).trim().toUpperCase(); const list = kind === 'stock' ? stocks : etfs; if (!tickerPattern.test(value) || list.includes(value) || list.length >= maxSymbols) return; if (kind === 'stock') { setStocks([...list, value]); setStockInput(''); } else { setEtfs([...list, value]); setEtfInput(''); } };
@@ -192,6 +200,7 @@ export default function DashboardClient({ initialData }: { initialData: InitialD
       <main className="app-shell mobile-mode">
         <section className="content">
           <MobileTerminalHeader liveState={liveState} lastUpdated={lastUpdated} />
+          <ProjectDemoNotice />
 
           <section className="primary-markets" id="overview">
             <div className="mobile-section-heading">
@@ -270,6 +279,7 @@ export default function DashboardClient({ initialData }: { initialData: InitialD
       {sidebarOpen && <button aria-label="Close navigation" className="mobile-sidebar-scrim" onClick={() => setSidebarOpen(false)} type="button" />}
 
       <section className="content">
+        <ProjectDemoNotice />
         <section className="primary-markets" id="overview">
           <div className="section-kicker">
             <button className="mobile-nav-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} type="button">☰</button>
