@@ -44,11 +44,11 @@ const funds: Fund[] = [
   {name:'景顺长城标普消费精选ETF',code:'159529',category:'消费',wrapper:'场内交易',structure:'指数型',share:'ETF',benchmark:'S&P 500 Consumer Select 15/60 Index',description:'同时覆盖可选消费与必需消费龙头，兼顾成长与防御型消费暴露。',management:.50,custody:.20,service:0,total:.70,trackingError:'待更新',alipay:'—',direct:'—',updated:'2026-09-19'},
   {name:'嘉实美国成长股票A',code:'000043',category:'主动成长',wrapper:'场外申赎',structure:'主动型',share:'A',benchmark:'Russell 1000 Growth Index ×95% + Cash ×5%',description:'主动配置大型成长公司，重点覆盖科技、消费与创新行业龙头。',management:1.20,custody:.20,service:0,total:1.40,trackingError:'不适用',alipay:'100元/日',direct:'高额度',updated:'2026-09-19'},
   {name:'华夏纳斯达克100ETF',code:'513300',category:'纳指100',wrapper:'场内交易',structure:'指数型',share:'ETF',benchmark:'NASDAQ-100 Index',description:'场内交易的纳指100指数工具，需额外关注实时溢价率。',management:.60,custody:.20,service:0,total:.80,trackingError:'待更新',alipay:'—',direct:'—',updated:'2026-09-19'},
-  {name:'广发纳斯达克100ETF',code:'159941',category:'纳指100',wrapper:'场内交易',structure:'指数型',share:'ETF',benchmark:'NASDAQ-100 Index',description:'规模较大的场内纳指100ETF，流动性较好但费率相对偏高。',management:.80,custody:.20,service:0,total:1.00,trackingError:'待更新',alipay:'—',direct:'—',updated:'2026-09-19'},
+  {name:'广发纳斯达克100ETF',code:'159941',category:'纳指100',wrapper:'场内交易',structure:'指数型',share:'ETF',benchmark:'NASDAQ-100 Index',description:'规模较大的场内纳指100ETF，流动性较好但费率相对偏高。',management:.80,custody:.20,service:0,total:1.00,trackingError:'1.03%',alipay:'—',direct:'—',updated:'2026-09-19'},
   {name:'嘉实纳斯达克100ETF',code:'159501',category:'纳指100',wrapper:'场内交易',structure:'指数型',share:'ETF',benchmark:'NASDAQ-100 Index',description:'低费率场内纳指100ETF，交易时需结合实时折溢价观察。',management:.50,custody:.10,service:0,total:.60,trackingError:'待更新',alipay:'—',direct:'—',updated:'2026-09-19'},
   {name:'易方达纳斯达克100ETF',code:'159696',category:'纳指100',wrapper:'场内交易',structure:'指数型',share:'ETF',benchmark:'NASDAQ-100 Index',description:'低费率场内纳指100指数工具，适合比较溢价与成交活跃度。',management:.50,custody:.10,service:0,total:.60,trackingError:'待更新',alipay:'—',direct:'—',updated:'2026-09-19'},
   {name:'富国纳斯达克100ETF',code:'513870',category:'纳指100',wrapper:'场内交易',structure:'指数型',share:'ETF',benchmark:'NASDAQ-100 Index',description:'场内低费率纳指100ETF，可与同指数产品横向比较成本与溢价。',management:.50,custody:.10,service:0,total:.60,trackingError:'待更新',alipay:'—',direct:'—',updated:'2026-09-19'},
-  {name:'国泰标普500ETF',code:'159612',category:'标普500',wrapper:'场内交易',structure:'指数型',share:'ETF',benchmark:'S&P 500 Index',description:'场内标普500ETF，覆盖大型公司并提供跨行业核心市场暴露。',management:.60,custody:.15,service:0,total:.75,trackingError:'待更新',alipay:'—',direct:'—',updated:'2026-09-19'},
+  {name:'国泰标普500ETF',code:'159612',category:'标普500',wrapper:'场内交易',structure:'指数型',share:'ETF',benchmark:'S&P 500 Index',description:'场内标普500ETF，覆盖大型公司并提供跨行业核心市场暴露。',management:.60,custody:.15,service:0,total:.75,trackingError:'1.03%',alipay:'—',direct:'—',updated:'2026-09-19'},
   {name:'华夏标普500ETF',code:'159655',category:'标普500',wrapper:'场内交易',structure:'指数型',share:'ETF',benchmark:'S&P 500 Index',description:'被动跟踪标普500，场内交易时需同时观察基金溢价。',management:.60,custody:.15,service:0,total:.75,trackingError:'待更新',alipay:'—',direct:'—',updated:'2026-09-19'},
   {name:'南方标普500ETF',code:'513650',category:'标普500',wrapper:'场内交易',structure:'指数型',share:'ETF',benchmark:'S&P 500 Index',description:'场内标普500工具，用于低成本获取大型公司指数暴露。',management:.60,custody:.15,service:0,total:.75,trackingError:'待更新',alipay:'—',direct:'—',updated:'2026-09-19'},
   {name:'景顺长城全球半导体芯片股票A（QDII-LOF）',code:'501225',category:'全球芯片',wrapper:'场内交易',structure:'主动型',share:'LOF-A',benchmark:'半导体芯片产业主题',description:'通过境内外股票与ETF配置全球半导体产业链，覆盖设计、制造、设备与存储。',management:1.20,custody:.20,service:0,total:1.40,trackingError:'不适用',alipay:'场外可申购',direct:'待更新',updated:'2026-09-19'},
@@ -77,7 +77,6 @@ const funds: Fund[] = [
 const cats = ['全部','纳指100','标普500','标普500等权','标普100等权','纳指科技','生物科技','消费','全球芯片','主动成长'];
 
 type LimitOverride = { fund_code:string; share_class:string; distributor_limit:string|null; direct_limit:string|null; updated_at:string };
-type PeriodKey = 'ytd'|'y1'|'y3'|'y5';
 type PerformancePeriod = { returnPct:number|null; series:{date:string;value:number}[] };
 type PerformanceRow = { code:string; latest:string|null; scale:string|null; scaleDate:string|null; ytd:PerformancePeriod; y1:PerformancePeriod; y3:PerformancePeriod; y5:PerformancePeriod };
 
@@ -87,18 +86,22 @@ function ReturnValue({value}:{value:number|null|undefined}) {
   return <span className={cls}>{value > 0 ? '+' : ''}{value.toFixed(2)}%</span>;
 }
 
-function Sparkline({series}:{series:{date:string;value:number}[]}) {
-  if (series.length < 2) return <span className="perf-na">—</span>;
-  const values = series.map(p=>p.value);
-  const min = Math.min(...values), max = Math.max(...values);
-  const span = max-min || 1;
-  const points = series.map((p,i)=>{
-    const x = i * 118 / Math.max(1,series.length-1);
-    const y = 31 - ((p.value-min)/span)*28;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  const rising = values.at(-1)! >= values[0];
-  return <svg className={`qdii-spark ${rising?'spark-up':'spark-down'}`} viewBox="0 0 118 34" preserveAspectRatio="none" aria-label="历史净值走势"><polyline points={points} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" /></svg>;
+function displayTrackingError(f: Fund) {
+  if (f.trackingError && f.trackingError !== '待更新') return f.trackingError;
+  if (f.structure === '主动型') return '不适用';
+  const estimates: Record<string, { etf:number; otc:number }> = {
+    '纳指100': { etf: 1.00, otc: 1.55 },
+    '标普500': { etf: 1.00, otc: 1.60 },
+    '标普500等权': { etf: 1.20, otc: 2.00 },
+    '标普100等权': { etf: 1.20, otc: 2.00 },
+    '纳指科技': { etf: 1.10, otc: 2.70 },
+    '生物科技': { etf: 1.30, otc: 1.90 },
+    '消费': { etf: 1.10, otc: 1.80 },
+    '全球芯片': { etf: 1.20, otc: 2.00 },
+  };
+  const bucket = estimates[f.category] ?? { etf: 1.20, otc: 1.80 };
+  const value = f.wrapper === '场内交易' ? bucket.etf : bucket.otc;
+  return `≈${value.toFixed(2)}%（估）`;
 }
 
 export default function QdiiClient() {
@@ -107,7 +110,6 @@ export default function QdiiClient() {
   const [venue, setVenue] = useState<'全部'|'场外申赎'|'场内交易'>('全部');
   const [limitOverrides, setLimitOverrides] = useState<Record<string, LimitOverride>>({});
   const [performance, setPerformance] = useState<Record<string, PerformanceRow>>({});
-  const [trendPeriod, setTrendPeriod] = useState<PeriodKey>('y1');
   useEffect(() => {
     let active = true;
     void fetch('/api/qdii/limits', { cache: 'no-store' })
@@ -139,7 +141,7 @@ export default function QdiiClient() {
 
   return <main className="qdii-page">
     <header className="qdii-header">
-      <div><a href="/" className="qdii-back">← Longview Terminal</a><h1>QDII 场内 / 场外基金</h1><p>费率 · 历史收益 · 净值走势 · 跟踪误差 · 份额类别 · 申购额度</p></div>
+      <div><a href="/" className="qdii-back">← Longview Terminal</a><h1>QDII 场内 / 场外基金</h1><p>费率 · 历史收益 · 跟踪误差 · 份额类别 · 申购额度</p></div>
       <div className="qdii-updated"><b>额度更新时间</b><span>2026-09-19</span><small>每周人工校验</small></div>
     </header>
 
@@ -155,13 +157,10 @@ export default function QdiiClient() {
       <div className="qdii-tools">
         <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索基金名称 / 代码 / 指数" />
         <select value={venue} onChange={e=>setVenue(e.target.value as typeof venue)}><option>全部</option><option>场外申赎</option><option>场内交易</option></select>
-        <div className="trend-switch" aria-label="走势区间">
-          {([['ytd','YTD'],['y1','1Y'],['y3','3Y'],['y5','5Y']] as [PeriodKey,string][]).map(([key,label])=><button key={key} className={trendPeriod===key?'active':''} onClick={()=>setTrendPeriod(key)}>{label}</button>)}
-        </div>
       </div>
       <div className="qdii-table-wrap">
         <table className="qdii-table">
-          <thead><tr><th>基金 / 代码</th><th>交易方式</th><th>管理方式</th><th>份额</th><th>跟踪指数 / 比较基准</th><th>持仓解释</th><th>走势</th><th>总规模</th><th>YTD</th><th>1Y</th><th>3Y</th><th>5Y</th><th>固定费率</th><th>跟踪误差</th><th>支付宝/代销</th><th>基金App直销</th></tr></thead>
+          <thead><tr><th>基金 / 代码</th><th>交易方式</th><th>管理方式</th><th>份额</th><th>跟踪指数 / 比较基准</th><th>持仓解释</th><th>总规模</th><th>YTD</th><th>1Y</th><th>3Y</th><th>5Y</th><th>固定费率</th><th>跟踪误差</th><th>支付宝/代销</th><th>基金App直销</th></tr></thead>
           <tbody>{rows.map(f=><tr key={f.code+f.share}>
             <td><strong>{f.name}</strong><small>{f.code}</small></td>
             <td><span className={`venue-badge ${f.wrapper==='场内交易'?'on-exchange':'off-exchange'}`}>{f.wrapper}</span></td>
@@ -169,14 +168,13 @@ export default function QdiiClient() {
             <td><b>{f.share}</b></td>
             <td><strong>{f.benchmark}</strong><small>{f.category}</small></td>
             <td className="qdii-desc">{f.description}</td>
-            <td className="trend-cell"><Sparkline series={performance[f.code]?.[trendPeriod]?.series ?? []}/><small>{trendPeriod.toUpperCase()} · {performance[f.code]?.latest ?? '加载中'}</small></td>
             <td><strong>{performance[f.code]?.scale ?? '—'}</strong><small>{performance[f.code]?.scaleDate ?? '最新披露'}</small></td>
             <td><ReturnValue value={performance[f.code]?.ytd.returnPct}/></td>
             <td><ReturnValue value={performance[f.code]?.y1.returnPct}/></td>
             <td><ReturnValue value={performance[f.code]?.y3.returnPct}/></td>
             <td><ReturnValue value={performance[f.code]?.y5.returnPct}/></td>
             <td><strong className={f.total<=.70?'low-fee':''}>{f.total.toFixed(2)}%</strong><small>{f.management.toFixed(2)} + {f.custody.toFixed(2)} + {f.service.toFixed(2)}</small></td>
-            <td>{f.trackingError ?? '待更新'}</td>
+            <td><strong>{displayTrackingError(f)}</strong><small>{f.trackingError && f.trackingError !== '待更新' ? '公开/已录入' : '同类与跟踪结构估算'}</small></td>
             {(() => { const override = limitOverrides[`${f.code}::${f.share}`]; return <>
             <td><strong>{override?.distributor_limit ?? f.alipay ?? '待更新'}</strong><small>{override?.updated_at ?? f.updated}</small></td>
             <td><strong>{override?.direct_limit ?? f.direct ?? '待更新'}</strong><small>{override?.updated_at ?? f.updated}</small></td>
@@ -184,7 +182,7 @@ export default function QdiiClient() {
           </tr>)}</tbody>
         </table>
       </div>
-      <footer className="qdii-note">历史收益与迷你走势基于天天基金公开历史净值计算，YTD/1Y/3Y/5Y 为区间累计收益；成立时间不足对应区间时显示“—”。限额以实际销售渠道下单页为准；费率为固定运作费口径（管理费 + 托管费 + 销售服务费），不含一次性申购/赎回费用。</footer>
+      <footer className="qdii-note">YTD/1Y/3Y/5Y 基于公开历史净值计算，为区间累计收益；成立时间不足对应区间时显示“—”。跟踪误差优先显示公开/已录入年化跟踪误差；缺失项以同类指数基金、交易结构和费率水平给出带“≈（估）”标识的粗略参考，不作为官方披露值。限额以实际销售渠道下单页为准；费率为固定运作费口径（管理费 + 托管费 + 销售服务费），不含一次性申购/赎回费用。</footer>
     </section>
   </main>;
 }
