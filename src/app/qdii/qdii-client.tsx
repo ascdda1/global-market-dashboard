@@ -77,12 +77,37 @@ const funds: Fund[] = [
 const cats = ['全部','纳指100','标普500','标普500等权','标普100等权','纳指科技','生物科技','消费','全球芯片','主动成长'];
 
 type LimitOverride = { fund_code:string; share_class:string; distributor_limit:string|null; direct_limit:string|null; updated_at:string };
+type PeriodKey = 'ytd'|'y1'|'y3'|'y5';
+type PerformancePeriod = { returnPct:number|null; series:{date:string;value:number}[] };
+type PerformanceRow = { code:string; latest:string|null; ytd:PerformancePeriod; y1:PerformancePeriod; y3:PerformancePeriod; y5:PerformancePeriod };
+
+function ReturnValue({value}:{value:number|null|undefined}) {
+  if (value == null) return <span className="perf-na">—</span>;
+  const cls = value > 0 ? 'perf-up' : value < 0 ? 'perf-down' : 'perf-flat';
+  return <span className={cls}>{value > 0 ? '+' : ''}{value.toFixed(2)}%</span>;
+}
+
+function Sparkline({series}:{series:{date:string;value:number}[]}) {
+  if (series.length < 2) return <span className="perf-na">—</span>;
+  const values = series.map(p=>p.value);
+  const min = Math.min(...values), max = Math.max(...values);
+  const span = max-min || 1;
+  const points = series.map((p,i)=>{
+    const x = i * 118 / Math.max(1,series.length-1);
+    const y = 31 - ((p.value-min)/span)*28;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const rising = values.at(-1)! >= values[0];
+  return <svg className={`qdii-spark ${rising?'spark-up':'spark-down'}`} viewBox="0 0 118 34" preserveAspectRatio="none" aria-label="历史净值走势"><polyline points={points} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" /></svg>;
+}
 
 export default function QdiiClient() {
   const [category, setCategory] = useState('全部');
   const [query, setQuery] = useState('');
   const [venue, setVenue] = useState<'全部'|'场外申赎'|'场内交易'>('全部');
   const [limitOverrides, setLimitOverrides] = useState<Record<string, LimitOverride>>({});
+  const [performance, setPerformance] = useState<Record<string, PerformanceRow>>({});
+  const [trendPeriod, setTrendPeriod] = useState<PeriodKey>('y1');
   useEffect(() => {
     let active = true;
     void fetch('/api/qdii/limits', { cache: 'no-store' })
@@ -94,6 +119,18 @@ export default function QdiiClient() {
       .catch(() => {});
     return () => { active = false; };
   }, []);
+  useEffect(() => {
+    let active = true;
+    const codes = [...new Set(funds.map(f=>f.code))].join(',');
+    void fetch(`/api/qdii/performance?codes=${encodeURIComponent(codes)}`, { cache:'no-store' })
+      .then(r=>r.json())
+      .then((j:{funds?:PerformanceRow[]})=>{
+        if (!active) return;
+        setPerformance(Object.fromEntries((j.funds ?? []).map(row=>[row.code,row])));
+      })
+      .catch(()=>{});
+    return () => { active = false; };
+  }, []);
   const rows = useMemo(() => funds.filter(f =>
     (category==='全部'||f.category===category) &&
     (venue==='全部'||f.wrapper===venue) &&
@@ -102,7 +139,7 @@ export default function QdiiClient() {
 
   return <main className="qdii-page">
     <header className="qdii-header">
-      <div><a href="/" className="qdii-back">← Longview Terminal</a><h1>QDII 场内 / 场外基金</h1><p>费率 · 基准 · 跟踪误差 · 份额类别 · 申购额度</p></div>
+      <div><a href="/" className="qdii-back">← Longview Terminal</a><h1>QDII 场内 / 场外基金</h1><p>费率 · 历史收益 · 净值走势 · 跟踪误差 · 份额类别 · 申购额度</p></div>
       <div className="qdii-updated"><b>额度更新时间</b><span>2026-09-19</span><small>每周人工校验</small></div>
     </header>
 
@@ -118,17 +155,24 @@ export default function QdiiClient() {
       <div className="qdii-tools">
         <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索基金名称 / 代码 / 指数" />
         <select value={venue} onChange={e=>setVenue(e.target.value as typeof venue)}><option>全部</option><option>场外申赎</option><option>场内交易</option></select>
+        <div className="trend-switch" aria-label="走势区间">
+          {([['ytd','YTD'],['y1','1Y'],['y3','3Y'],['y5','5Y']] as [PeriodKey,string][]).map(([key,label])=><button key={key} className={trendPeriod===key?'active':''} onClick={()=>setTrendPeriod(key)}>{label}</button>)}
+        </div>
       </div>
       <div className="qdii-table-wrap">
         <table className="qdii-table">
-          <thead><tr><th>基金 / 代码</th><th>交易方式</th><th>管理方式</th><th>份额</th><th>跟踪指数 / 比较基准</th><th>持仓解释</th><th>固定费率</th><th>跟踪误差</th><th>支付宝/代销</th><th>基金App直销</th></tr></thead>
+          <thead><tr><th>基金 / 代码</th><th>交易方式</th><th>管理方式</th><th>份额</th><th>跟踪指数 / 比较基准</th><th>走势</th><th>YTD</th><th>1Y</th><th>3Y</th><th>5Y</th><th>固定费率</th><th>跟踪误差</th><th>支付宝/代销</th><th>基金App直销</th></tr></thead>
           <tbody>{rows.map(f=><tr key={f.code+f.share}>
             <td><strong>{f.name}</strong><small>{f.code}</small></td>
             <td><span className={`venue-badge ${f.wrapper==='场内交易'?'on-exchange':'off-exchange'}`}>{f.wrapper}</span></td>
             <td><span className="qdii-tag">{f.structure}</span></td>
             <td><b>{f.share}</b></td>
             <td><strong>{f.benchmark}</strong><small>{f.category}</small></td>
-            <td className="qdii-desc">{f.description}</td>
+            <td className="trend-cell"><Sparkline series={performance[f.code]?.[trendPeriod]?.series ?? []}/><small>{trendPeriod.toUpperCase()} · {performance[f.code]?.latest ?? '加载中'}</small></td>
+            <td><ReturnValue value={performance[f.code]?.ytd.returnPct}/></td>
+            <td><ReturnValue value={performance[f.code]?.y1.returnPct}/></td>
+            <td><ReturnValue value={performance[f.code]?.y3.returnPct}/></td>
+            <td><ReturnValue value={performance[f.code]?.y5.returnPct}/></td>
             <td><strong className={f.total<=.70?'low-fee':''}>{f.total.toFixed(2)}%</strong><small>{f.management.toFixed(2)} + {f.custody.toFixed(2)} + {f.service.toFixed(2)}</small></td>
             <td>{f.trackingError ?? '待更新'}</td>
             {(() => { const override = limitOverrides[`${f.code}::${f.share}`]; return <>
@@ -138,7 +182,7 @@ export default function QdiiClient() {
           </tr>)}</tbody>
         </table>
       </div>
-      <footer className="qdii-note">限额以实际销售渠道下单页为准；费率为固定运作费口径（管理费 + 托管费 + 销售服务费），不含一次性申购/赎回费用。跟踪误差优先采用第三方平台披露的年化跟踪误差；场内ETF若仅有短周期公开值会标注统计区间。</footer>
+      <footer className="qdii-note">历史收益与迷你走势基于天天基金公开历史净值计算，YTD/1Y/3Y/5Y 为区间累计收益；成立时间不足对应区间时显示“—”。限额以实际销售渠道下单页为准；费率为固定运作费口径（管理费 + 托管费 + 销售服务费），不含一次性申购/赎回费用。</footer>
     </section>
   </main>;
 }
