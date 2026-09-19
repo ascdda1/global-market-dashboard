@@ -21,6 +21,31 @@ function parseHistory(raw: string): NavPoint[] {
   return points.sort((a,b)=>a.date.localeCompare(b.date));
 }
 
+function parsePingzhongdata(raw: string): NavPoint[] {
+  const ac = raw.match(/var\s+Data_ACWorthTrend\s*=\s*(\[[\s\S]*?\]);/);
+  if (ac) {
+    try {
+      const rows = JSON.parse(ac[1]) as [number, number][];
+      const points = rows
+        .filter(row => Array.isArray(row) && Number.isFinite(row[0]) && Number.isFinite(row[1]) && row[1] > 0)
+        .map(row => ({ date: new Date(row[0]).toISOString().slice(0,10), value: Number(row[1]) }));
+      if (points.length > 1) return points.sort((a,b)=>a.date.localeCompare(b.date));
+    } catch {}
+  }
+
+  const nw = raw.match(/var\s+Data_netWorthTrend\s*=\s*(\[[\s\S]*?\]);/);
+  if (nw) {
+    try {
+      const rows = JSON.parse(nw[1]) as {x:number;y:number}[];
+      const points = rows
+        .filter(row => Number.isFinite(row?.x) && Number.isFinite(row?.y) && row.y > 0)
+        .map(row => ({ date: new Date(row.x).toISOString().slice(0,10), value: Number(row.y) }));
+      if (points.length > 1) return points.sort((a,b)=>a.date.localeCompare(b.date));
+    } catch {}
+  }
+  return [];
+}
+
 function targetDate(period: PeriodKey, latest: Date) {
   const d = new Date(latest);
   if (period === 'ytd') return new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
@@ -75,13 +100,32 @@ async function fetchFund(code: string) {
   start.setUTCDate(start.getUTCDate() - 14);
   const sdate = start.toISOString().slice(0,10);
   const edate = now.toISOString().slice(0,10);
-  const url = `https://fundf10.eastmoney.com/F10DataApi.aspx?type=lsjz&code=${encodeURIComponent(code)}&page=1&per=2000&sdate=${sdate}&edate=${edate}`;
-  const [response, scaleInfo] = await Promise.all([fetch(url, {
-    headers: { Referer: `https://fundf10.eastmoney.com/jjjz_${code}.html`, 'User-Agent': 'Mozilla/5.0' },
-    next: { revalidate: 21600 },
-  }), fetchScale(code)]);
-  if (!response.ok) throw new Error(`history ${response.status}`);
-  const points = parseHistory(await response.text());
+
+  const primaryUrl = `https://fund.eastmoney.com/pingzhongdata/${encodeURIComponent(code)}.js?v=${Date.now()}`;
+  const fallbackUrl = `https://fundf10.eastmoney.com/F10DataApi.aspx?type=lsjz&code=${encodeURIComponent(code)}&page=1&per=2000&sdate=${sdate}&edate=${edate}`;
+
+  const [primary, scaleInfo] = await Promise.all([
+    fetch(primaryUrl, {
+      headers: { Referer: `https://fund.eastmoney.com/${code}.html`, 'User-Agent': 'Mozilla/5.0' },
+      next: { revalidate: 21600 },
+    }).catch(()=>null),
+    fetchScale(code),
+  ]);
+
+  let points: NavPoint[] = [];
+  if (primary?.ok) points = parsePingzhongdata(await primary.text());
+
+  if (points.length < 2) {
+    const fallback = await fetch(fallbackUrl, {
+      headers: { Referer: `https://fundf10.eastmoney.com/jjjz_${code}.html`, 'User-Agent': 'Mozilla/5.0' },
+      next: { revalidate: 21600 },
+    }).catch(()=>null);
+    if (fallback?.ok) points = parseHistory(await fallback.text());
+  }
+
+  if (points.length < 2) throw new Error('No usable NAV history');
+  const cutoff = sdate;
+  points = points.filter(point => point.date >= cutoff);
   const latest = points.at(-1)?.date ?? null;
   return {
     code,
@@ -118,5 +162,5 @@ export async function GET(request: Request) {
     try { return await fetchFund(code); }
     catch { return { code, latest:null, scale:null, scaleDate:null, ytd:{returnPct:null,series:[]}, y1:{returnPct:null,series:[]}, y3:{returnPct:null,series:[]}, y5:{returnPct:null,series:[]} }; }
   });
-  return NextResponse.json({ funds, source: 'Eastmoney / 天天基金', generatedAt: new Date().toISOString() });
+  return NextResponse.json({ funds, source: 'Eastmoney / 天天基金', generatedAt: new Date().toISOString() }, { headers: { 'Cache-Control': 'public, s-maxage=21600, stale-while-revalidate=86400' } });
 }
