@@ -8,9 +8,9 @@ type QdiiLimitRow = {
 
 function config() {
   const url = process.env.SUPABASE_URL?.replace(/\/$/, '');
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return null;
-  return { url, key };
+  return { url, key, legacyJwt: key.startsWith('eyJ') };
 }
 
 export async function readQdiiLimits(): Promise<QdiiLimitRow[]> {
@@ -18,7 +18,7 @@ export async function readQdiiLimits(): Promise<QdiiLimitRow[]> {
   if (!c) return [];
   const response = await fetch(
     `${c.url}/rest/v1/qdii_purchase_limits?select=fund_code,share_class,distributor_limit,direct_limit,updated_at&order=fund_code.asc`,
-    { headers: { apikey: c.key, Authorization: `Bearer ${c.key}` }, cache: 'no-store' },
+    { headers: c.legacyJwt ? { apikey: c.key, Authorization: `Bearer ${c.key}` } : { apikey: c.key }, cache: 'no-store' },
   );
   if (!response.ok) throw new Error(`QDII limit read failed: ${response.status}`);
   return response.json() as Promise<QdiiLimitRow[]>;
@@ -37,7 +37,7 @@ export async function upsertQdiiLimit(input: {
     method: 'POST',
     headers: {
       apikey: c.key,
-      Authorization: `Bearer ${c.key}`,
+      ...(c.legacyJwt ? { Authorization: `Bearer ${c.key}` } : {}),
       'Content-Type': 'application/json',
       Prefer: 'resolution=merge-duplicates,return=representation',
     },
