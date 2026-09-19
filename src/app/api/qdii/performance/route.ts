@@ -56,6 +56,18 @@ function periodResult(points: NavPoint[], period: PeriodKey) {
   return { returnPct, series: sample(sliced) };
 }
 
+async function fetchScale(code: string) {
+  const response = await fetch(`https://fundf10.eastmoney.com/jbgk_${code}.html`, {
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+    next: { revalidate: 86400 },
+  });
+  if (!response.ok) return { scale: null as string|null, scaleDate: null as string|null };
+  const text = stripTags(await response.text()).replace(/\s+/g, ' ');
+  const match = text.match(/净资产规模\s*[:：]?\s*([0-9.]+亿元)（截止至[:：]?\s*(\d{4}年\d{2}月\d{2}日)）/);
+  if (!match) return { scale: null as string|null, scaleDate: null as string|null };
+  return { scale: match[1], scaleDate: match[2].replace(/年|月/g,'-').replace('日','') };
+}
+
 async function fetchFund(code: string) {
   const now = new Date();
   const start = new Date(now);
@@ -64,16 +76,18 @@ async function fetchFund(code: string) {
   const sdate = start.toISOString().slice(0,10);
   const edate = now.toISOString().slice(0,10);
   const url = `https://fundf10.eastmoney.com/F10DataApi.aspx?type=lsjz&code=${encodeURIComponent(code)}&page=1&per=2000&sdate=${sdate}&edate=${edate}`;
-  const response = await fetch(url, {
+  const [response, scaleInfo] = await Promise.all([fetch(url, {
     headers: { Referer: `https://fundf10.eastmoney.com/jjjz_${code}.html`, 'User-Agent': 'Mozilla/5.0' },
     next: { revalidate: 21600 },
-  });
+  }), fetchScale(code)]);
   if (!response.ok) throw new Error(`history ${response.status}`);
   const points = parseHistory(await response.text());
   const latest = points.at(-1)?.date ?? null;
   return {
     code,
     latest,
+    scale: scaleInfo.scale,
+    scaleDate: scaleInfo.scaleDate,
     ytd: periodResult(points, 'ytd'),
     y1: periodResult(points, 'y1'),
     y3: periodResult(points, 'y3'),
@@ -102,7 +116,7 @@ export async function GET(request: Request) {
 
   const funds = await mapLimit(codes, 8, async code => {
     try { return await fetchFund(code); }
-    catch { return { code, latest:null, ytd:{returnPct:null,series:[]}, y1:{returnPct:null,series:[]}, y3:{returnPct:null,series:[]}, y5:{returnPct:null,series:[]} }; }
+    catch { return { code, latest:null, scale:null, scaleDate:null, ytd:{returnPct:null,series:[]}, y1:{returnPct:null,series:[]}, y3:{returnPct:null,series:[]}, y5:{returnPct:null,series:[]} }; }
   });
   return NextResponse.json({ funds, source: 'Eastmoney / 天天基金', generatedAt: new Date().toISOString() });
 }
