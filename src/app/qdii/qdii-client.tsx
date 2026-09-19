@@ -87,21 +87,9 @@ function ReturnValue({value}:{value:number|null|undefined}) {
 }
 
 function displayTrackingError(f: Fund) {
-  if (f.trackingError && f.trackingError !== '待更新') return f.trackingError;
   if (f.structure === '主动型') return '不适用';
-  const estimates: Record<string, { etf:number; otc:number }> = {
-    '纳指100': { etf: 1.00, otc: 1.55 },
-    '标普500': { etf: 1.00, otc: 1.60 },
-    '标普500等权': { etf: 1.20, otc: 2.00 },
-    '标普100等权': { etf: 1.20, otc: 2.00 },
-    '纳指科技': { etf: 1.10, otc: 2.70 },
-    '生物科技': { etf: 1.30, otc: 1.90 },
-    '消费': { etf: 1.10, otc: 1.80 },
-    '全球芯片': { etf: 1.20, otc: 2.00 },
-  };
-  const bucket = estimates[f.category] ?? { etf: 1.20, otc: 1.80 };
-  const value = f.wrapper === '场内交易' ? bucket.etf : bucket.otc;
-  return `≈${value.toFixed(2)}%（估）`;
+  if (f.trackingError && f.trackingError !== '待更新') return f.trackingError;
+  return '待补充';
 }
 
 export default function QdiiClient() {
@@ -222,7 +210,7 @@ export default function QdiiClient() {
             <td><ReturnValue value={performance[f.code]?.y3.returnPct}/></td>
             <td><ReturnValue value={performance[f.code]?.y5.returnPct}/></td>
             <td><strong className={f.total<=.70?'low-fee':''}>{f.total.toFixed(2)}%</strong><small>{f.management.toFixed(2)} + {f.custody.toFixed(2)} + {f.service.toFixed(2)}</small></td>
-            <td><strong>{displayTrackingError(f)}</strong><small>{f.trackingError && f.trackingError !== '待更新' ? '公开/已录入' : '同类与跟踪结构估算'}</small></td>
+            <td><strong>{displayTrackingError(f)}</strong><small>{f.structure === '主动型' ? '主动基金不适用' : (f.trackingError && f.trackingError !== '待更新' ? '真实已录入' : '等待真实数据')}</small></td>
             {(() => { const override = limitOverrides[`${f.code}::${f.share}`]; return <>
             <td><strong>{override?.distributor_limit ?? f.alipay ?? '待更新'}</strong><small>{override?.updated_at ?? f.updated}</small></td>
             <td><strong>{override?.direct_limit ?? f.direct ?? '待更新'}</strong><small>{override?.updated_at ?? f.updated}</small></td>
@@ -230,7 +218,7 @@ export default function QdiiClient() {
           </tr>)}</tbody>
         </table>
       </div>
-      <footer className="qdii-note">YTD/1Y/3Y/5Y 基于公开历史净值计算，为严格对应区间的累计收益；成立时间不足对应区间时直接显示“不适用”，不会使用较短历史代替。指数型场外基金默认隐藏 C 类份额，以减少重复并突出长期持有常用的 A/E/I 份额。跟踪误差优先显示公开/已录入年化跟踪误差；缺失项以同类指数基金、交易结构和费率水平给出带“≈（估）”标识的粗略参考，不作为官方披露值。限额以实际销售渠道下单页为准；费率为固定运作费口径（管理费 + 托管费 + 销售服务费），不含一次性申购/赎回费用。</footer>
+      <footer className="qdii-note">YTD/1Y/3Y/5Y 基于公开历史净值计算，为严格对应区间的累计收益；成立时间不足对应区间时直接显示“不适用”，不会使用较短历史代替。指数型场外基金默认隐藏 C 类份额，以减少重复并突出长期持有常用的 A/E/I 份额。跟踪误差仅显示真实已录入数据；未录入的指数基金显示“待补充”，不再使用任何估算值。限额以实际销售渠道下单页为准；费率为固定运作费口径（管理费 + 托管费 + 销售服务费），不含一次性申购/赎回费用。</footer>
     </section>
   </main>;
 }
