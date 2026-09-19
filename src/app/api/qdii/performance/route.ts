@@ -78,6 +78,72 @@ function sample(points: NavPoint[], maxPoints = 34) {
   return out;
 }
 
+type RiskStats = {
+  maxDrawdownPct: number|null;
+  recoveryDays: number|null;
+  recoveryStatus: 'recovered'|'unrecovered'|'not_applicable';
+  sharpe: number|null;
+};
+
+function threeYearRisk(points: NavPoint[]): RiskStats {
+  const sliced = slicePeriod(points, 'y3');
+  if (sliced.length < 2) return { maxDrawdownPct:null, recoveryDays:null, recoveryStatus:'not_applicable', sharpe:null };
+
+  let peakValue = sliced[0].value;
+  let peakIndex = 0;
+  let maxDrawdown = 0;
+  let troughIndex = 0;
+  let drawdownPeakIndex = 0;
+
+  for (let i=1;i<sliced.length;i++) {
+    const value = sliced[i].value;
+    if (value > peakValue) {
+      peakValue = value;
+      peakIndex = i;
+    }
+    const drawdown = value / peakValue - 1;
+    if (drawdown < maxDrawdown) {
+      maxDrawdown = drawdown;
+      troughIndex = i;
+      drawdownPeakIndex = peakIndex;
+    }
+  }
+
+  let recoveryIndex = -1;
+  const recoveryLevel = sliced[drawdownPeakIndex]?.value ?? sliced[0].value;
+  for (let i=troughIndex+1;i<sliced.length;i++) {
+    if (sliced[i].value >= recoveryLevel) {
+      recoveryIndex = i;
+      break;
+    }
+  }
+
+  const dayDiff = (a:string,b:string) => Math.max(0, Math.round((new Date(b+'T00:00:00Z').getTime()-new Date(a+'T00:00:00Z').getTime())/86400000));
+  const recoveryDays = recoveryIndex >= 0
+    ? dayDiff(sliced[troughIndex].date, sliced[recoveryIndex].date)
+    : dayDiff(sliced[troughIndex].date, sliced[sliced.length-1].date);
+
+  const returns:number[] = [];
+  for (let i=1;i<sliced.length;i++) {
+    const prev=sliced[i-1].value, cur=sliced[i].value;
+    if (prev > 0 && cur > 0) returns.push(cur/prev-1);
+  }
+  let sharpe:number|null = null;
+  if (returns.length > 30) {
+    const mean = returns.reduce((a,b)=>a+b,0)/returns.length;
+    const variance = returns.reduce((a,b)=>a+(b-mean)**2,0)/(returns.length-1);
+    const sd = Math.sqrt(variance);
+    if (sd > 0) sharpe = mean / sd * Math.sqrt(252);
+  }
+
+  return {
+    maxDrawdownPct: maxDrawdown * 100,
+    recoveryDays,
+    recoveryStatus: recoveryIndex >= 0 ? 'recovered' : 'unrecovered',
+    sharpe,
+  };
+}
+
 function periodResult(points: NavPoint[], period: PeriodKey) {
   const sliced = slicePeriod(points, period);
   if (sliced.length < 2) return { returnPct: null as number | null, series: [] as NavPoint[] };
@@ -167,6 +233,7 @@ async function fetchFund(code: string) {
   const cutoff = sdate;
   points = points.filter(point => point.date >= cutoff);
   const latest = points.at(-1)?.date ?? null;
+  const risk3y = threeYearRisk(points);
   return {
     code,
     latest,
@@ -176,6 +243,7 @@ async function fetchFund(code: string) {
     y1: { returnPct: stageReturns.y1, series: [] },
     y3: { returnPct: stageReturns.y3, series: [] },
     y5: { returnPct: stageReturns.y5, series: [] },
+    risk3y,
   };
 }
 
@@ -200,7 +268,7 @@ export async function GET(request: Request) {
 
   const funds = await mapLimit(codes, 8, async code => {
     try { return await fetchFund(code); }
-    catch { return { code, latest:null, scale:null, scaleDate:null, ytd:{returnPct:null,series:[]}, y1:{returnPct:null,series:[]}, y3:{returnPct:null,series:[]}, y5:{returnPct:null,series:[]} }; }
+    catch { return { code, latest:null, scale:null, scaleDate:null, ytd:{returnPct:null,series:[]}, y1:{returnPct:null,series:[]}, y3:{returnPct:null,series:[]}, y5:{returnPct:null,series:[]}, risk3y:{maxDrawdownPct:null,recoveryDays:null,recoveryStatus:'not_applicable',sharpe:null} }; }
   });
   return NextResponse.json({ funds, source: 'Eastmoney / 天天基金阶段涨幅接口', generatedAt: new Date().toISOString() }, { headers: { 'Cache-Control': 'public, s-maxage=21600, stale-while-revalidate=86400' } });
 }
