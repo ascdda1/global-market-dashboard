@@ -193,7 +193,7 @@ export default function DashboardClient({ initialData }: { initialData: InitialD
   }
 
   const add = (kind: 'stock' | 'etf') => (event: React.FormEvent) => { event.preventDefault(); const value = (kind === 'stock' ? stockInput : etfInput).trim().toUpperCase(); const list = kind === 'stock' ? stocks : etfs; if (!tickerPattern.test(value) || list.includes(value) || list.length >= maxSymbols) return; if (kind === 'stock') { setStocks([...list, value]); setStockInput(''); } else { setEtfs([...list, value]); setEtfInput(''); } };
-  const nav: Array<[string, string, BilingualLabel]> = [['#overview', '▦', moduleLabels.overview], ['#stocks', '⌁', moduleLabels.stocks], ['#etfs', '▤', moduleLabels.etfs], ['/dca', '◫', moduleLabels.dcaSimulation], ['/portfolio', '◉', { zh: '持仓模拟', en: 'Portfolio' }], ['/qdii', '▦', { zh: 'QDII基金', en: 'QDII Funds' }]];
+  const nav: Array<[string, string, BilingualLabel]> = [['#overview', '▦', moduleLabels.overview], ['#stocks', '⌁', moduleLabels.stocks], ['#etfs', '▤', moduleLabels.etfs], ['/qdii', '▦', { zh: 'QDII基金', en: 'QDII Funds' }], ['/dca', '◫', moduleLabels.dcaSimulation], ['/portfolio', '◉', { zh: '持仓模拟', en: 'Portfolio' }]];
 
   if (mobileMode) {
     return (
