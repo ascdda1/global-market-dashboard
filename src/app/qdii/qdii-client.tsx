@@ -51,7 +51,7 @@ const funds: Fund[] = [
   {name:'国泰标普500ETF',code:'159612',category:'标普500',wrapper:'场内交易',structure:'指数型',share:'ETF',benchmark:'S&P 500 Index',description:'场内标普500ETF，覆盖大型公司并提供跨行业核心市场暴露。',management:.60,custody:.15,service:0,total:.75,trackingError:'待更新',alipay:'—',direct:'—',updated:'2026-09-19'},
   {name:'华夏标普500ETF',code:'159655',category:'标普500',wrapper:'场内交易',structure:'指数型',share:'ETF',benchmark:'S&P 500 Index',description:'被动跟踪标普500，场内交易时需同时观察基金溢价。',management:.60,custody:.15,service:0,total:.75,trackingError:'待更新',alipay:'—',direct:'—',updated:'2026-09-19'},
   {name:'南方标普500ETF',code:'513650',category:'标普500',wrapper:'场内交易',structure:'指数型',share:'ETF',benchmark:'S&P 500 Index',description:'场内标普500工具，用于低成本获取大型公司指数暴露。',management:.60,custody:.15,service:0,total:.75,trackingError:'待更新',alipay:'—',direct:'—',updated:'2026-09-19'},
-  {name:'华夏全球半导体芯片ETF',code:'待补充',category:'全球芯片',wrapper:'场内交易',structure:'指数型',share:'ETF',benchmark:'Global Semiconductor Index',description:'覆盖全球半导体设计、制造、设备与存储产业链公司。',management:.60,custody:.20,service:0,total:.80,trackingError:'待更新',alipay:'—',direct:'—',updated:'2026-09-19'}
+  {name:'景顺长城全球半导体芯片股票A（QDII-LOF）',code:'501225',category:'全球芯片',wrapper:'场内交易',structure:'主动型',share:'LOF-A',benchmark:'半导体芯片产业主题',description:'通过境内外股票与ETF配置全球半导体产业链，覆盖设计、制造、设备与存储。',management:1.20,custody:.20,service:0,total:1.40,trackingError:'不适用',alipay:'场外可申购',direct:'待更新',updated:'2026-09-19'}
 ];
 
 const cats = ['全部','纳指100','标普500','标普500等权','标普100等权','纳指科技','生物科技','消费','全球芯片','主动成长'];
