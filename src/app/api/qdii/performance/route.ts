@@ -87,6 +87,37 @@ function periodResult(points: NavPoint[], period: PeriodKey) {
   return { returnPct, series: sample(sliced) };
 }
 
+type StageReturns = { ytd:number|null; y1:number|null; y3:number|null; y5:number|null };
+
+async function fetchStageReturns(code: string): Promise<StageReturns> {
+  const params = new URLSearchParams({
+    FCODE: code,
+    AppVersion: '6.3.8',
+    OSVersion: '14.3',
+    plat: 'Iphone',
+    product: 'EFund',
+    version: '6.3.6',
+  });
+  const response = await fetch(`https://fundmobapi.eastmoney.com/FundMNewApi/FundMNPeriodIncrease?${params.toString()}`, {
+    headers: { 'User-Agent': 'Mozilla/5.0', Referer: `https://fund.eastmoney.com/${code}.html` },
+    next: { revalidate: 21600 },
+  });
+  if (!response.ok) throw new Error(`stage returns ${response.status}`);
+  const json = await response.json() as { Datas?: { title?:string; syl?:string|number|null }[] };
+  const map = Object.fromEntries((json.Datas ?? []).map(row => [row.title, row.syl]));
+  const toNumber = (value: string|number|null|undefined) => {
+    if (value == null || value === '' || value === '--') return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+  return {
+    ytd: toNumber(map.JN),
+    y1: toNumber(map['1N']),
+    y3: toNumber(map['3N']),
+    y5: toNumber(map['5N']),
+  };
+}
+
 async function fetchScale(code: string) {
   const response = await fetch(`https://fundf10.eastmoney.com/jbgk_${code}.html`, {
     headers: { 'User-Agent': 'Mozilla/5.0' },
@@ -110,12 +141,13 @@ async function fetchFund(code: string) {
   const primaryUrl = `https://fund.eastmoney.com/pingzhongdata/${encodeURIComponent(code)}.js?v=${Date.now()}`;
   const fallbackUrl = `https://fundf10.eastmoney.com/F10DataApi.aspx?type=lsjz&code=${encodeURIComponent(code)}&page=1&per=2000&sdate=${sdate}&edate=${edate}`;
 
-  const [primary, scaleInfo] = await Promise.all([
+  const [primary, scaleInfo, stageReturns] = await Promise.all([
     fetch(primaryUrl, {
       headers: { Referer: `https://fund.eastmoney.com/${code}.html`, 'User-Agent': 'Mozilla/5.0' },
       next: { revalidate: 21600 },
     }).catch(()=>null),
     fetchScale(code),
+    fetchStageReturns(code).catch(()=>({ ytd:null, y1:null, y3:null, y5:null })),
   ]);
 
   let points: NavPoint[] = [];
@@ -138,10 +170,10 @@ async function fetchFund(code: string) {
     latest,
     scale: scaleInfo.scale,
     scaleDate: scaleInfo.scaleDate,
-    ytd: periodResult(points, 'ytd'),
-    y1: periodResult(points, 'y1'),
-    y3: periodResult(points, 'y3'),
-    y5: periodResult(points, 'y5'),
+    ytd: { returnPct: stageReturns.ytd, series: [] },
+    y1: { returnPct: stageReturns.y1, series: [] },
+    y3: { returnPct: stageReturns.y3, series: [] },
+    y5: { returnPct: stageReturns.y5, series: [] },
   };
 }
 
@@ -168,5 +200,5 @@ export async function GET(request: Request) {
     try { return await fetchFund(code); }
     catch { return { code, latest:null, scale:null, scaleDate:null, ytd:{returnPct:null,series:[]}, y1:{returnPct:null,series:[]}, y3:{returnPct:null,series:[]}, y5:{returnPct:null,series:[]} }; }
   });
-  return NextResponse.json({ funds, source: 'Eastmoney / 天天基金', generatedAt: new Date().toISOString() }, { headers: { 'Cache-Control': 'public, s-maxage=21600, stale-while-revalidate=86400' } });
+  return NextResponse.json({ funds, source: 'Eastmoney / 天天基金阶段涨幅接口', generatedAt: new Date().toISOString() }, { headers: { 'Cache-Control': 'public, s-maxage=21600, stale-while-revalidate=86400' } });
 }
