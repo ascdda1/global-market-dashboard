@@ -107,10 +107,11 @@ export default function QdiiClient() {
       </div>
       <div className="qdii-table-wrap">
         <table className="qdii-table">
-          <thead><tr><th>基金 / 代码</th><th>类型</th><th>份额</th><th>跟踪指数 / 比较基准</th><th>持仓解释</th><th>固定费率</th><th>跟踪误差</th><th>支付宝/代销</th><th>基金App直销</th></tr></thead>
+          <thead><tr><th>基金 / 代码</th><th>交易方式</th><th>管理方式</th><th>份额</th><th>跟踪指数 / 比较基准</th><th>持仓解释</th><th>固定费率</th><th>跟踪误差</th><th>支付宝/代销</th><th>基金App直销</th></tr></thead>
           <tbody>{rows.map(f=><tr key={f.code+f.share}>
             <td><strong>{f.name}</strong><small>{f.code}</small></td>
-            <td><span className="qdii-tag">{f.structure}</span><small>{f.wrapper}</small></td>
+            <td><span className={`venue-badge ${f.wrapper==='场内交易'?'on-exchange':'off-exchange'}`}>{f.wrapper}</span></td>
+            <td><span className="qdii-tag">{f.structure}</span></td>
             <td><b>{f.share}</b></td>
             <td><strong>{f.benchmark}</strong><small>{f.category}</small></td>
             <td className="qdii-desc">{f.description}</td>
