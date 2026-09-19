@@ -126,6 +126,19 @@ src/app/
 
 For a more detailed chronological record, see [CHANGELOG.md](CHANGELOG.md).
 
+## Automated Production Deployment
+
+Production runs on AWS Lightsail behind Nginx with PM2. GitHub Actions deploys every push to `main` through SSH and runs a fast-forward-only pull, `npm ci`, production build, and PM2 restart.
+
+Required repository Actions secrets:
+
+- `AWS_HOST` — public IPv4 address or hostname of the Lightsail instance.
+- `AWS_USER` — SSH user, normally `ubuntu`.
+- `AWS_SSH_KEY` — private Ed25519 deployment key whose public key is present in `~/.ssh/authorized_keys` on the server.
+- `AWS_PORT` — optional; defaults to port 22.
+
+Application secrets such as Supabase credentials and `QDII_ADMIN_SECRET` stay only in the server-side `.env.local`; they are never committed to GitHub.
+
 ## Future Roadmap
 
 - Replace the explicitly labeled Calendar, News, and Key People fallback/mock providers with licensed, production-appropriate sources.
