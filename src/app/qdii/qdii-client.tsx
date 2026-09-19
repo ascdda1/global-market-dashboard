@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type Fund = {
   name: string;
@@ -76,10 +76,24 @@ const funds: Fund[] = [
 
 const cats = ['全部','纳指100','标普500','标普500等权','标普100等权','纳指科技','生物科技','消费','全球芯片','主动成长'];
 
+type LimitOverride = { fund_code:string; share_class:string; distributor_limit:string|null; direct_limit:string|null; updated_at:string };
+
 export default function QdiiClient() {
   const [category, setCategory] = useState('全部');
   const [query, setQuery] = useState('');
   const [venue, setVenue] = useState<'全部'|'场外申赎'|'场内交易'>('全部');
+  const [limitOverrides, setLimitOverrides] = useState<Record<string, LimitOverride>>({});
+  useEffect(() => {
+    let active = true;
+    void fetch('/api/qdii/limits', { cache: 'no-store' })
+      .then(r => r.json())
+      .then((j: { limits?: LimitOverride[] }) => {
+        if (!active) return;
+        setLimitOverrides(Object.fromEntries((j.limits ?? []).map(row => [`${row.fund_code}::${row.share_class}`, row])));
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
   const rows = useMemo(() => funds.filter(f =>
     (category==='全部'||f.category===category) &&
     (venue==='全部'||f.wrapper===venue) &&
@@ -117,8 +131,10 @@ export default function QdiiClient() {
             <td className="qdii-desc">{f.description}</td>
             <td><strong className={f.total<=.70?'low-fee':''}>{f.total.toFixed(2)}%</strong><small>{f.management.toFixed(2)} + {f.custody.toFixed(2)} + {f.service.toFixed(2)}</small></td>
             <td>{f.trackingError ?? '待更新'}</td>
-            <td><strong>{f.alipay ?? '待更新'}</strong><small>{f.updated}</small></td>
-            <td><strong>{f.direct ?? '待更新'}</strong><small>{f.updated}</small></td>
+            {(() => { const override = limitOverrides[`${f.code}::${f.share}`]; return <>
+            <td><strong>{override?.distributor_limit ?? f.alipay ?? '待更新'}</strong><small>{override?.updated_at ?? f.updated}</small></td>
+            <td><strong>{override?.direct_limit ?? f.direct ?? '待更新'}</strong><small>{override?.updated_at ?? f.updated}</small></td>
+          </>; })()}
           </tr>)}</tbody>
         </table>
       </div>
