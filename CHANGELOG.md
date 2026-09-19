@@ -2,6 +2,14 @@
 
 This file records major product iterations for the Longview / Global Market Dashboard project.
 
+## 2026-09-20 — QDII Limit Admin
+
+### Added
+- Private `/qdii/admin` editor for distributor and fund-app purchase limits.
+- Authenticated server-side API protected by `QDII_ADMIN_SECRET`.
+- Supabase-backed limit override table so quota edits can appear without rebuilding the application.
+- Front-end fallback behavior: static research data remains available if the dynamic limit store is unavailable.
+
 ## 2026-09-20 — QDII Research Expansion
 
 ### Added
