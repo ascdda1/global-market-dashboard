@@ -81,7 +81,7 @@ type PerformancePeriod = { returnPct:number|null; series:{date:string;value:numb
 type PerformanceRow = { code:string; latest:string|null; scale:string|null; scaleDate:string|null; ytd:PerformancePeriod; y1:PerformancePeriod; y3:PerformancePeriod; y5:PerformancePeriod };
 
 function ReturnValue({value}:{value:number|null|undefined}) {
-  if (value == null) return <span className="perf-na">—</span>;
+  if (value == null) return <span className="perf-na">不适用</span>;
   const cls = value > 0 ? 'perf-up' : value < 0 ? 'perf-down' : 'perf-flat';
   return <span className={cls}>{value > 0 ? '+' : ''}{value.toFixed(2)}%</span>;
 }
@@ -182,7 +182,7 @@ export default function QdiiClient() {
           </tr>)}</tbody>
         </table>
       </div>
-      <footer className="qdii-note">YTD/1Y/3Y/5Y 基于公开历史净值计算，为区间累计收益；成立时间不足对应区间时显示“—”。跟踪误差优先显示公开/已录入年化跟踪误差；缺失项以同类指数基金、交易结构和费率水平给出带“≈（估）”标识的粗略参考，不作为官方披露值。限额以实际销售渠道下单页为准；费率为固定运作费口径（管理费 + 托管费 + 销售服务费），不含一次性申购/赎回费用。</footer>
+      <footer className="qdii-note">YTD/1Y/3Y/5Y 基于公开历史净值计算，为严格对应区间的累计收益；成立时间不足对应区间时直接显示“不适用”，不会使用较短历史代替。跟踪误差优先显示公开/已录入年化跟踪误差；缺失项以同类指数基金、交易结构和费率水平给出带“≈（估）”标识的粗略参考，不作为官方披露值。限额以实际销售渠道下单页为准；费率为固定运作费口径（管理费 + 托管费 + 销售服务费），不含一次性申购/赎回费用。</footer>
     </section>
   </main>;
 }
