@@ -79,7 +79,7 @@ const cats = ['全部','纳指100','标普500','标普500等权','标普100等�
 type LimitOverride = { fund_code:string; share_class:string; distributor_limit:string|null; direct_limit:string|null; updated_at:string };
 type PeriodKey = 'ytd'|'y1'|'y3'|'y5';
 type PerformancePeriod = { returnPct:number|null; series:{date:string;value:number}[] };
-type PerformanceRow = { code:string; latest:string|null; ytd:PerformancePeriod; y1:PerformancePeriod; y3:PerformancePeriod; y5:PerformancePeriod };
+type PerformanceRow = { code:string; latest:string|null; scale:string|null; scaleDate:string|null; ytd:PerformancePeriod; y1:PerformancePeriod; y3:PerformancePeriod; y5:PerformancePeriod };
 
 function ReturnValue({value}:{value:number|null|undefined}) {
   if (value == null) return <span className="perf-na">—</span>;
@@ -161,7 +161,7 @@ export default function QdiiClient() {
       </div>
       <div className="qdii-table-wrap">
         <table className="qdii-table">
-          <thead><tr><th>基金 / 代码</th><th>交易方式</th><th>管理方式</th><th>份额</th><th>跟踪指数 / 比较基准</th><th>持仓解释</th><th>走势</th><th>YTD</th><th>1Y</th><th>3Y</th><th>5Y</th><th>固定费率</th><th>跟踪误差</th><th>支付宝/代销</th><th>基金App直销</th></tr></thead>
+          <thead><tr><th>基金 / 代码</th><th>交易方式</th><th>管理方式</th><th>份额</th><th>跟踪指数 / 比较基准</th><th>持仓解释</th><th>走势</th><th>总规模</th><th>YTD</th><th>1Y</th><th>3Y</th><th>5Y</th><th>固定费率</th><th>跟踪误差</th><th>支付宝/代销</th><th>基金App直销</th></tr></thead>
           <tbody>{rows.map(f=><tr key={f.code+f.share}>
             <td><strong>{f.name}</strong><small>{f.code}</small></td>
             <td><span className={`venue-badge ${f.wrapper==='场内交易'?'on-exchange':'off-exchange'}`}>{f.wrapper}</span></td>
@@ -170,6 +170,7 @@ export default function QdiiClient() {
             <td><strong>{f.benchmark}</strong><small>{f.category}</small></td>
             <td className="qdii-desc">{f.description}</td>
             <td className="trend-cell"><Sparkline series={performance[f.code]?.[trendPeriod]?.series ?? []}/><small>{trendPeriod.toUpperCase()} · {performance[f.code]?.latest ?? '加载中'}</small></td>
+            <td><strong>{performance[f.code]?.scale ?? '—'}</strong><small>{performance[f.code]?.scaleDate ?? '最新披露'}</small></td>
             <td><ReturnValue value={performance[f.code]?.ytd.returnPct}/></td>
             <td><ReturnValue value={performance[f.code]?.y1.returnPct}/></td>
             <td><ReturnValue value={performance[f.code]?.y3.returnPct}/></td>
