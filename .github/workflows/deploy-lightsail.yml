@@ -1,0 +1,63 @@
+name: Deploy to AWS Lightsail
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy Longview
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.AWS_SSH_KEY }}
+          AWS_HOST: ${{ secrets.AWS_HOST }}
+          AWS_PORT: ${{ secrets.AWS_PORT }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/longview_deploy
+          chmod 600 ~/.ssh/longview_deploy
+          PORT="${AWS_PORT:-22}"
+          ssh-keyscan -p "$PORT" -H "$AWS_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy application
+        env:
+          AWS_HOST: ${{ secrets.AWS_HOST }}
+          AWS_USER: ${{ secrets.AWS_USER }}
+          AWS_PORT: ${{ secrets.AWS_PORT }}
+        run: |
+          set -euo pipefail
+          PORT="${AWS_PORT:-22}"
+          USER="${AWS_USER:-ubuntu}"
+          ssh -i ~/.ssh/longview_deploy -p "$PORT" "$USER@$AWS_HOST" <<'REMOTE'
+            set -euo pipefail
+            cd /home/ubuntu/global-market-dashboard
+            git fetch origin main
+            git checkout main
+            git pull --ff-only origin main
+            npm ci
+            npm run build
+            pm2 restart longview-terminal --update-env
+            pm2 save
+            pm2 status longview-terminal
+          REMOTE
+
+      - name: Deployment summary
+        run: |
+          echo "### Longview production deploy completed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Branch: main" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Process: longview-terminal" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Target: AWS Lightsail" >> "$GITHUB_STEP_SUMMARY"
