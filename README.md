@@ -105,6 +105,27 @@ src/app/
   *.css              Dashboard and module styles
 ```
 
+## Version History
+
+### Current — QDII Research Expansion (2026-09-20)
+
+- Added a dedicated **QDII on-exchange / off-exchange fund research** module at `/qdii`.
+- Expanded the research universe from 30 to **50 curated funds**, prioritizing Nasdaq-100, S&P 500, Nasdaq technology, biotechnology, consumer, semiconductor/chip, and selected active strategies.
+- Added cross-fund comparison fields for **benchmark, share class (A/C/E/I/ETF/LOF), management fee, custody fee, sales service fee, total recurring fee, tracking error, distributor purchase limit, direct fund-app limit, and update date**.
+- Added concise exposure descriptions so each fund can be understood without opening a prospectus.
+- Added category, venue, and search filters, plus low-fee highlighting.
+- Corrected share-class mapping for the Invesco Great Wall Nasdaq Technology family and replaced a placeholder semiconductor entry with a real QDII-LOF product.
+- Kept quota data deliberately conservative: uncertain values remain marked as pending instead of being fabricated.
+
+### V1 — Global Market Dashboard
+
+- Built a bilingual global market dashboard with major equity indices, gold, oil, Bitcoin, U.S. Treasury yields, stock and ETF watchlists, macro indicators, and economic-calendar modules.
+- Added long-range historical market charts and a 3-second live quote refresh loop for selected instruments.
+- Added a DCA simulation module with persistent records through Supabase when configured.
+- Added responsive desktop/mobile layouts, server-side data routing, source fallbacks, and deployment support for the production site.
+
+For a more detailed chronological record, see [CHANGELOG.md](CHANGELOG.md).
+
 ## Future Roadmap
 
 - Replace the explicitly labeled Calendar, News, and Key People fallback/mock providers with licensed, production-appropriate sources.
