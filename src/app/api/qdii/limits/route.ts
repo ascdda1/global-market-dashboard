@@ -12,7 +12,10 @@ export async function GET() {
 export async function POST(request: Request) {
   const secret = process.env.QDII_ADMIN_SECRET;
   const auth = request.headers.get('authorization');
-  if (!secret || auth !== `Bearer ${secret}`) {
+  if (!secret) {
+    return NextResponse.json({ error: 'Admin secret not configured' }, { status: 401 });
+  }
+  if (auth !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -37,7 +40,8 @@ export async function POST(request: Request) {
       updatedAt: body.updatedAt,
     });
     return NextResponse.json({ ok: true, result });
-  } catch {
-    return NextResponse.json({ error: 'Save failed' }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Save failed';
+    return NextResponse.json({ error: /Supabase is not configured/.test(message) ? 'Supabase server credentials not configured' : 'Database write failed' }, { status: 500 });
   }
 }
