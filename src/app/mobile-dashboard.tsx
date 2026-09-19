@@ -180,6 +180,7 @@ export function MobileBottomNav() {
       <a href="#overview"><b>◈</b><span>总览<small>Overview</small></span></a>
       <a href="#stocks"><b>⌁</b><span>股票<small>Stocks</small></span></a>
       <a href="#etfs"><b>▤</b><span>ETF<small>ETFs</small></span></a>
+      <a href="/qdii"><b>▦</b><span>QDII<small>Funds</small></span></a>
       <a href="/dca"><b>◫</b><span>定投<small>DCA</small></span></a>
       <a href="/portfolio"><b>◉</b><span>持仓<small>Portfolio</small></span></a>
     </nav>
