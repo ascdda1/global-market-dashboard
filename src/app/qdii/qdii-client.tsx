@@ -78,7 +78,8 @@ const cats = ['全部','纳指100','标普500','标普500等权','标普100等�
 
 type LimitOverride = { fund_code:string; share_class:string; distributor_limit:string|null; direct_limit:string|null; updated_at:string };
 type PerformancePeriod = { returnPct:number|null; series:{date:string;value:number}[] };
-type PerformanceRow = { code:string; latest:string|null; scale:string|null; scaleDate:string|null; ytd:PerformancePeriod; y1:PerformancePeriod; y3:PerformancePeriod; y5:PerformancePeriod };
+type RiskStats = { maxDrawdownPct:number|null; recoveryDays:number|null; recoveryStatus:'recovered'|'unrecovered'|'not_applicable'; sharpe:number|null };
+type PerformanceRow = { code:string; latest:string|null; scale:string|null; scaleDate:string|null; ytd:PerformancePeriod; y1:PerformancePeriod; y3:PerformancePeriod; y5:PerformancePeriod; risk3y:RiskStats };
 
 function ReturnValue({value}:{value:number|null|undefined}) {
   if (value == null) return <span className="perf-na">不适用</span>;
@@ -96,7 +97,7 @@ export default function QdiiClient({ embedded = false }: { embedded?: boolean } 
   const [category, setCategory] = useState('全部');
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'场外基金'|'场内ETF'>('场外基金');
-  const [sortKey, setSortKey] = useState<'fee'|'ytd'|'y1'|'y3'|'y5'|'scale'|'tracking'>('fee');
+  const [sortKey, setSortKey] = useState<'fee'|'ytd'|'y1'|'y3'|'y5'|'scale'|'tracking'|'drawdown'|'sharpe'>('fee');
   const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
   const [limitOverrides, setLimitOverrides] = useState<Record<string, LimitOverride>>({});
   const [performance, setPerformance] = useState<Record<string, PerformanceRow>>({});
@@ -142,6 +143,8 @@ export default function QdiiClient({ embedded = false }: { embedded?: boolean } 
         const m = p?.scale?.match(/[0-9.]+/);
         return m ? Number(m[0]) : null;
       }
+      if (sortKey === 'drawdown') return p?.risk3y.maxDrawdownPct ?? null;
+      if (sortKey === 'sharpe') return p?.risk3y.sharpe ?? null;
       if (sortKey === 'tracking') {
         const m = displayTrackingError(f).match(/[0-9.]+/);
         return m ? Number(m[0]) : null;
@@ -189,6 +192,8 @@ export default function QdiiClient({ embedded = false }: { embedded?: boolean } 
           <option value="y5">按 5Y</option>
           <option value="scale">按总规模</option>
           <option value="tracking">按跟踪误差</option>
+          <option value="drawdown">按最大回撤</option>
+          <option value="sharpe">按夏普比率</option>
         </select>
         <select value={sortDir} onChange={e=>setSortDir(e.target.value as typeof sortDir)}>
           <option value="desc">从高到低</option>
@@ -197,7 +202,7 @@ export default function QdiiClient({ embedded = false }: { embedded?: boolean } 
       </div>
       <div className="qdii-table-wrap">
         <table className="qdii-table">
-          <thead><tr><th>基金 / 代码</th><th>交易方式</th><th>管理方式</th><th>份额</th><th>跟踪指数 / 比较基准</th><th>持仓解释</th><th>总规模</th><th>YTD</th><th>1Y</th><th>3Y</th><th>5Y</th><th>固定费率</th><th>跟踪误差</th><th>支付宝/代销</th><th>基金App直销</th></tr></thead>
+          <thead><tr><th>基金 / 代码</th><th>交易方式</th><th>管理方式</th><th>份额</th><th>跟踪指数 / 比较基准</th><th>持仓解释</th><th>总规模</th><th>YTD</th><th>1Y</th><th>3Y</th><th>5Y</th><th>近3年最大回撤</th><th>修复时长</th><th>近3年夏普</th><th>固定费率</th><th>跟踪误差</th><th>支付宝/代销</th><th>基金App直销</th></tr></thead>
           <tbody>{rows.map(f=><tr key={f.code+f.share}>
             <td><strong>{f.name}</strong><small>{f.code}</small></td>
             <td><span className={`venue-badge ${f.wrapper==='场内交易'?'on-exchange':'off-exchange'}`}>{f.wrapper}</span></td>
@@ -210,6 +215,9 @@ export default function QdiiClient({ embedded = false }: { embedded?: boolean } 
             <td><ReturnValue value={performance[f.code]?.y1.returnPct}/></td>
             <td><ReturnValue value={performance[f.code]?.y3.returnPct}/></td>
             <td><ReturnValue value={performance[f.code]?.y5.returnPct}/></td>
+            <td><strong>{performance[f.code]?.risk3y.maxDrawdownPct == null ? '不适用' : `${performance[f.code].risk3y.maxDrawdownPct.toFixed(2)}%`}</strong><small>峰值至谷底</small></td>
+            <td><strong>{performance[f.code]?.risk3y.recoveryStatus === 'not_applicable' || performance[f.code]?.risk3y.recoveryDays == null ? '不适用' : `${performance[f.code].risk3y.recoveryDays}天`}</strong><small>{performance[f.code]?.risk3y.recoveryStatus === 'unrecovered' ? '尚未修复·截至最新净值' : performance[f.code]?.risk3y.recoveryStatus === 'recovered' ? '谷底→重回前高' : '历史不足3年'}</small></td>
+            <td><strong>{performance[f.code]?.risk3y.sharpe == null ? '不适用' : performance[f.code].risk3y.sharpe.toFixed(2)}</strong><small>年化·无风险利率按0%</small></td>
             <td><strong className={f.total<=.70?'low-fee':''}>{f.total.toFixed(2)}%</strong><small>{f.management.toFixed(2)} + {f.custody.toFixed(2)} + {f.service.toFixed(2)}</small></td>
             <td><strong>{displayTrackingError(f)}</strong><small>{f.structure === '主动型' ? '主动基金不适用' : (f.trackingError && f.trackingError !== '待更新' ? '真实已录入' : '等待真实数据')}</small></td>
             {(() => { const override = limitOverrides[`${f.code}::${f.share}`]; return <>
@@ -219,7 +227,8 @@ export default function QdiiClient({ embedded = false }: { embedded?: boolean } 
           </tr>)}</tbody>
         </table>
       </div>
-      <footer className="qdii-note">YTD/1Y/3Y/5Y 基于公开历史净值计算，为严格对应区间的累计收益；成立时间不足对应区间时直接显示“不适用”，不会使用较短历史代替。指数型场外基金默认隐藏 C 类份额，以减少重复并突出长期持有常用的 A/E/I 份额。跟踪误差仅显示真实已录入数据；未录入的指数基金显示“待补充”，不再使用任何估算值。限额以实际销售渠道下单页为准；费率为固定运作费口径（管理费 + 托管费 + 销售服务费），不含一次性申购/赎回费用。</footer>
+      <div className="qdii-risk-note"><strong>风险指标说明</strong><span><b>最大回撤：</b>近3年内从某个历史高点跌到随后最低点的最大跌幅，越接近0通常代表下行更温和。</span><span><b>修复时长：</b>从最大回撤谷底开始，到净值重新回到回撤前高点所需的自然日；若仍未回到前高，则显示“尚未修复”并统计至最新净值日。</span><span><b>夏普比率：</b>衡量每承担1单位波动获得多少风险调整后收益；数值越高通常越好。这里统一使用近3年日频净值、252交易日年化，并将无风险利率设为0%以便横向比较。</span></div>
+      <footer className="qdii-note">YTD/1Y/3Y/5Y 读取公开阶段收益数据，为严格对应区间的累计收益；成立时间不足对应区间时直接显示“不适用”，不会使用较短历史代替。指数型场外基金默认隐藏 C 类份额，以减少重复并突出长期持有常用的 A/E/I 份额。跟踪误差仅显示真实已录入数据；未录入的指数基金显示“待补充”，不再使用任何估算值。最大回撤、修复时长与夏普比率统一采用近3年净值序列，历史不足3年显示“不适用”。限额以实际销售渠道下单页为准；费率为固定运作费口径（管理费 + 托管费 + 销售服务费），不含一次性申购/赎回费用。</footer>
     </section>
   </Root>;
 }
