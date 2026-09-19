@@ -10,6 +10,7 @@ import BrandLogo from './brand-logo';
 import LegalDisclaimer from './legal-disclaimer';
 import { MobileAssetSheet, MobileBottomNav, MobileOverviewCard, MobileTerminalHeader, MobileWatchSection, type MobileAssetSelection } from './mobile-dashboard';
 import { ETF_COOKIE, STOCK_COOKIE } from './watchlist-config';
+import QdiiClient from './qdii/qdii-client';
 
 type Range = LongRange;
 const maxSymbols = 30;
@@ -193,7 +194,7 @@ export default function DashboardClient({ initialData }: { initialData: InitialD
   }
 
   const add = (kind: 'stock' | 'etf') => (event: React.FormEvent) => { event.preventDefault(); const value = (kind === 'stock' ? stockInput : etfInput).trim().toUpperCase(); const list = kind === 'stock' ? stocks : etfs; if (!tickerPattern.test(value) || list.includes(value) || list.length >= maxSymbols) return; if (kind === 'stock') { setStocks([...list, value]); setStockInput(''); } else { setEtfs([...list, value]); setEtfInput(''); } };
-  const nav: Array<[string, string, BilingualLabel]> = [['#overview', '▦', moduleLabels.overview], ['#stocks', '⌁', moduleLabels.stocks], ['#etfs', '▤', moduleLabels.etfs], ['/qdii', '▦', { zh: 'QDII基金', en: 'QDII Funds' }], ['/dca', '◫', moduleLabels.dcaSimulation], ['/portfolio', '◉', { zh: '持仓模拟', en: 'Portfolio' }]];
+  const nav: Array<[string, string, BilingualLabel]> = [['#overview', '▦', moduleLabels.overview], ['#stocks', '⌁', moduleLabels.stocks], ['#etfs', '▤', moduleLabels.etfs], ['#qdii', '▦', { zh: 'QDII基金', en: 'QDII Funds' }], ['/dca', '◫', moduleLabels.dcaSimulation], ['/portfolio', '◉', { zh: '持仓模拟', en: 'Portfolio' }]];
 
   if (mobileMode) {
     return (
@@ -298,6 +299,7 @@ export default function DashboardClient({ initialData }: { initialData: InitialD
 
         <WatchSection id="stocks" title={{ en: 'My Stocks', zh: '我的股票' }} symbols={stocks} input={stockInput} setInput={setStockInput} add={add('stock')} remove={(symbol) => setStocks(stocks.filter((item) => item !== symbol))} quotes={quotes} range={range} onRange={setRange} logoKind="stock" flashes={flashes} deepHistoryReady={deepHistoryReady} />
         <WatchSection id="etfs" title={{ en: 'My ETFs', zh: '我的 ETF' }} symbols={etfs} input={etfInput} setInput={setEtfInput} add={add('etf')} remove={(symbol) => setEtfs(etfs.filter((item) => item !== symbol))} quotes={quotes} range={range} onRange={setRange} logoKind="etf" flashes={flashes} deepHistoryReady={deepHistoryReady} />
+        <section id="qdii" className="embedded-qdii-section"><QdiiClient embedded /></section>
         <LegalDisclaimer />
       </section>
     </main>
