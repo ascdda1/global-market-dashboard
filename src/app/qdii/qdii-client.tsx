@@ -92,7 +92,7 @@ function displayTrackingError(f: Fund) {
   return '待补充';
 }
 
-export default function QdiiClient() {
+export default function QdiiClient({ embedded = false }: { embedded?: boolean } = {}) {
   const [category, setCategory] = useState('全部');
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'场外基金'|'场内ETF'>('场外基金');
@@ -158,9 +158,10 @@ export default function QdiiClient() {
     });
   }, [category, query, view, sortKey, sortDir, performance]);
 
-  return <main className="qdii-page">
+  const Root = embedded ? 'div' : 'main';
+  return <Root className={`qdii-page${embedded ? ' qdii-embedded' : ''}`}>
     <header className="qdii-header">
-      <div><a href="/" className="qdii-back">← Longview Terminal</a><h1>QDII 场内 / 场外基金</h1><p>费率 · 历史收益 · 跟踪误差 · 份额类别 · 申购额度</p></div>
+      <div>{!embedded && <a href="/" className="qdii-back">← Longview Terminal</a>}<h1>QDII 场内 / 场外基金</h1><p>费率 · 历史收益 · 跟踪误差 · 份额类别 · 申购额度</p></div>
       <div className="qdii-updated"><b>额度更新时间</b><span>2026-09-19</span><small>每周人工校验</small></div>
     </header>
 
@@ -220,5 +221,5 @@ export default function QdiiClient() {
       </div>
       <footer className="qdii-note">YTD/1Y/3Y/5Y 基于公开历史净值计算，为严格对应区间的累计收益；成立时间不足对应区间时直接显示“不适用”，不会使用较短历史代替。指数型场外基金默认隐藏 C 类份额，以减少重复并突出长期持有常用的 A/E/I 份额。跟踪误差仅显示真实已录入数据；未录入的指数基金显示“待补充”，不再使用任何估算值。限额以实际销售渠道下单页为准；费率为固定运作费口径（管理费 + 托管费 + 销售服务费），不含一次性申购/赎回费用。</footer>
     </section>
-  </main>;
+  </Root>;
 }
