@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 
+type CatalogFund = { name:string; code:string; share:string };
+
 type Override = {
   fund_code: string;
   share_class: string;
@@ -12,6 +14,8 @@ type Override = {
 
 export default function QdiiAdminClient() {
   const [secret, setSecret] = useState('');
+  const [catalog, setCatalog] = useState<CatalogFund[]>([]);
+  const [selectedFund, setSelectedFund] = useState('');
   const [fundCode, setFundCode] = useState('');
   const [shareClass, setShareClass] = useState('A');
   const [distributorLimit, setDistributorLimit] = useState('');
@@ -21,9 +25,20 @@ export default function QdiiAdminClient() {
   const [state, setState] = useState('');
 
   async function load() {
-    const r = await fetch('/api/qdii/limits', { cache: 'no-store' });
-    const j = await r.json();
-    setRows(j.limits ?? []);
+    const [limitRes, catalogRes] = await Promise.all([
+      fetch('/api/qdii/limits', { cache: 'no-store' }),
+      fetch('/api/qdii/catalog', { cache: 'no-store' }),
+    ]);
+    const [limitJson, catalogJson] = await Promise.all([limitRes.json(), catalogRes.json()]);
+    setRows(limitJson.limits ?? []);
+    setCatalog(catalogJson.funds ?? []);
+    const first = (catalogJson.funds ?? [])[0] as CatalogFund | undefined;
+    if (first && !selectedFund) {
+      const key = `${first.code}::${first.share}`;
+      setSelectedFund(key);
+      setFundCode(first.code);
+      setShareClass(first.share);
+    }
   }
 
   useEffect(() => { void load(); }, []);
@@ -37,7 +52,9 @@ export default function QdiiAdminClient() {
       body: JSON.stringify({ fundCode, shareClass, distributorLimit, directLimit, updatedAt }),
     });
     if (!r.ok) {
-      setState(r.status === 401 ? '密钥不正确' : '保存失败');
+      const j = await r.json().catch(()=>({}));
+      if (r.status === 401) setState(j.error === 'Admin secret not configured' ? '服务器还未配置管理密钥' : '管理密钥不正确');
+      else setState(j.error ? `保存失败：${j.error}` : '保存失败');
       return;
     }
     setState('已保存，前台刷新后立即生效');
@@ -50,8 +67,11 @@ export default function QdiiAdminClient() {
     <header><a href="/qdii">← 返回 QDII</a><h1>QDII 限额管理</h1><p>仅维护动态申购额度，不修改基金静态资料。</p></header>
     <form onSubmit={save} className="admin-form">
       <label>管理密钥<input type="password" value={secret} onChange={e=>setSecret(e.target.value)} required /></label>
-      <label>基金代码<input value={fundCode} onChange={e=>setFundCode(e.target.value)} placeholder="019736" required /></label>
-      <label>份额类别<input value={shareClass} onChange={e=>setShareClass(e.target.value)} placeholder="A / C / E / I / ETF" required /></label>
+      <label>选择基金<select value={selectedFund} onChange={e=>{const key=e.target.value;setSelectedFund(key);const [code,share]=key.split('::');setFundCode(code);setShareClass(share);}}>
+        {catalog.map(f=><option key={f.code+'::'+f.share} value={f.code+'::'+f.share}>{f.name} · {f.code} · {f.share}</option>)}
+      </select></label>
+      <label>基金代码<input value={fundCode} readOnly /></label>
+      <label>份额类别<input value={shareClass} readOnly /></label>
       <label>支付宝 / 代销额度<input value={distributorLimit} onChange={e=>setDistributorLimit(e.target.value)} placeholder="200元/日、暂停、不限额…" /></label>
       <label>基金 App 直销额度<input value={directLimit} onChange={e=>setDirectLimit(e.target.value)} placeholder="1000元/日、暂停、不限额…" /></label>
       <label>更新时间<input type="date" value={updatedAt} onChange={e=>setUpdatedAt(e.target.value)} required /></label>
