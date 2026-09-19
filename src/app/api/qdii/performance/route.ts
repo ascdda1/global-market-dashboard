@@ -91,12 +91,14 @@ type StageReturns = { ytd:number|null; y1:number|null; y3:number|null; y5:number
 
 async function fetchStageReturns(code: string): Promise<StageReturns> {
   const params = new URLSearchParams({
-    FCODE: code,
-    AppVersion: '6.3.8',
-    OSVersion: '14.3',
-    plat: 'Iphone',
+    pageIndex: '1',
+    pageSize: '200',
+    plat: 'Android',
+    appType: 'ttjj',
     product: 'EFund',
-    version: '6.3.6',
+    Version: '1',
+    deviceid: '1234567890',
+    Fcode: code,
   });
   const response = await fetch(`https://fundmobapi.eastmoney.com/FundMNewApi/FundMNPeriodIncrease?${params.toString()}`, {
     headers: { 'User-Agent': 'Mozilla/5.0', Referer: `https://fund.eastmoney.com/${code}.html` },
