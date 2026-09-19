@@ -58,6 +58,12 @@ function slicePeriod(points: NavPoint[], period: PeriodKey) {
   const latest = new Date(points[points.length - 1].date + 'T00:00:00Z');
   const target = targetDate(period, latest);
   const targetText = target.toISOString().slice(0,10);
+
+  // Strict-period rule: if the fund did not exist at the beginning of the
+  // requested window, the metric is not applicable. Never substitute a
+  // shorter "since inception" period for YTD/1Y/3Y/5Y.
+  if (points[0].date > targetText) return [];
+
   const start = points.findIndex(p => p.date >= targetText);
   return points.slice(start < 0 ? 0 : start);
 }
