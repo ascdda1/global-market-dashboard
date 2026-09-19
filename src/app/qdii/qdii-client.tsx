@@ -107,7 +107,9 @@ function displayTrackingError(f: Fund) {
 export default function QdiiClient() {
   const [category, setCategory] = useState('全部');
   const [query, setQuery] = useState('');
-  const [venue, setVenue] = useState<'全部'|'场外申赎'|'场内交易'>('全部');
+  const [view, setView] = useState<'场外基金'|'场内ETF'>('场外基金');
+  const [sortKey, setSortKey] = useState<'fee'|'ytd'|'y1'|'y3'|'y5'|'scale'|'tracking'>('fee');
+  const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
   const [limitOverrides, setLimitOverrides] = useState<Record<string, LimitOverride>>({});
   const [performance, setPerformance] = useState<Record<string, PerformanceRow>>({});
   useEffect(() => {
@@ -133,11 +135,40 @@ export default function QdiiClient() {
       .catch(()=>{});
     return () => { active = false; };
   }, []);
-  const rows = useMemo(() => funds.filter(f =>
-    (category==='全部'||f.category===category) &&
-    (venue==='全部'||f.wrapper===venue) &&
-    (!query || (f.name+f.code+f.benchmark).toLowerCase().includes(query.toLowerCase()))
-  ).sort((a,b)=>a.total-b.total), [category, query, venue]);
+  const rows = useMemo(() => {
+    const visible = funds.filter(f =>
+      (view === '场外基金' ? f.wrapper === '场外申赎' : f.wrapper === '场内交易') &&
+      !(view === '场外基金' && f.structure === '指数型' && f.share === 'C') &&
+      (category==='全部'||f.category===category) &&
+      (!query || (f.name+f.code+f.benchmark).toLowerCase().includes(query.toLowerCase()))
+    );
+
+    const metric = (f: Fund) => {
+      const p = performance[f.code];
+      if (sortKey === 'fee') return f.total;
+      if (sortKey === 'ytd') return p?.ytd.returnPct ?? null;
+      if (sortKey === 'y1') return p?.y1.returnPct ?? null;
+      if (sortKey === 'y3') return p?.y3.returnPct ?? null;
+      if (sortKey === 'y5') return p?.y5.returnPct ?? null;
+      if (sortKey === 'scale') {
+        const m = p?.scale?.match(/[0-9.]+/);
+        return m ? Number(m[0]) : null;
+      }
+      if (sortKey === 'tracking') {
+        const m = displayTrackingError(f).match(/[0-9.]+/);
+        return m ? Number(m[0]) : null;
+      }
+      return null;
+    };
+
+    return visible.sort((a,b) => {
+      const av = metric(a), bv = metric(b);
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return sortDir === 'asc' ? av-bv : bv-av;
+    });
+  }, [category, query, view, sortKey, sortDir, performance]);
 
   return <main className="qdii-page">
     <header className="qdii-header">
@@ -147,16 +178,33 @@ export default function QdiiClient() {
 
     <section className="qdii-summary">
       <article><small>精选基金</small><strong>{funds.length}</strong><span>精选研究池</span></article>
-      <article><small>场外申赎</small><strong>{funds.filter(f=>f.wrapper==='场外申赎').length}</strong><span>含 A/C/E/I</span></article>
+      <article><small>场外申赎</small><strong>{funds.filter(f=>f.wrapper==='场外申赎').length}</strong><span>指数型仅展示 A/E/I</span></article>
       <article><small>场内交易</small><strong>{funds.filter(f=>f.wrapper==='场内交易').length}</strong><span>ETF / LOF</span></article>
       <article><small>最低固定费率</small><strong>{Math.min(...funds.map(f=>f.total)).toFixed(2)}%</strong><span>管理+托管+服务</span></article>
     </section>
 
     <section className="qdii-panel">
+      <div className="qdii-view-tabs">
+        <button className={view==='场外基金'?'active':''} onClick={()=>setView('场外基金')}>场外基金</button>
+        <button className={view==='场内ETF'?'active':''} onClick={()=>setView('场内ETF')}>场内 ETF / LOF</button>
+      </div>
+      {view==='场外基金' && <div className="qdii-share-note">长期持有通常优先关注 A 类等低持续费率份额；为减少同一指数产品的重复展示，本页指数型基金默认隐藏 C 类，仅保留 A / E / I 等更适合长期比较的份额。</div>}
       <div className="qdii-tabs">{cats.map(c=><button key={c} className={category===c?'active':''} onClick={()=>setCategory(c)}>{c}</button>)}</div>
       <div className="qdii-tools">
         <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索基金名称 / 代码 / 指数" />
-        <select value={venue} onChange={e=>setVenue(e.target.value as typeof venue)}><option>全部</option><option>场外申赎</option><option>场内交易</option></select>
+        <select value={sortKey} onChange={e=>setSortKey(e.target.value as typeof sortKey)}>
+          <option value="fee">按固定费率</option>
+          <option value="ytd">按 YTD</option>
+          <option value="y1">按 1Y</option>
+          <option value="y3">按 3Y</option>
+          <option value="y5">按 5Y</option>
+          <option value="scale">按总规模</option>
+          <option value="tracking">按跟踪误差</option>
+        </select>
+        <select value={sortDir} onChange={e=>setSortDir(e.target.value as typeof sortDir)}>
+          <option value="desc">从高到低</option>
+          <option value="asc">从低到高</option>
+        </select>
       </div>
       <div className="qdii-table-wrap">
         <table className="qdii-table">
@@ -182,7 +230,7 @@ export default function QdiiClient() {
           </tr>)}</tbody>
         </table>
       </div>
-      <footer className="qdii-note">YTD/1Y/3Y/5Y 基于公开历史净值计算，为严格对应区间的累计收益；成立时间不足对应区间时直接显示“不适用”，不会使用较短历史代替。跟踪误差优先显示公开/已录入年化跟踪误差；缺失项以同类指数基金、交易结构和费率水平给出带“≈（估）”标识的粗略参考，不作为官方披露值。限额以实际销售渠道下单页为准；费率为固定运作费口径（管理费 + 托管费 + 销售服务费），不含一次性申购/赎回费用。</footer>
+      <footer className="qdii-note">YTD/1Y/3Y/5Y 基于公开历史净值计算，为严格对应区间的累计收益；成立时间不足对应区间时直接显示“不适用”，不会使用较短历史代替。指数型场外基金默认隐藏 C 类份额，以减少重复并突出长期持有常用的 A/E/I 份额。跟踪误差优先显示公开/已录入年化跟踪误差；缺失项以同类指数基金、交易结构和费率水平给出带“≈（估）”标识的粗略参考，不作为官方披露值。限额以实际销售渠道下单页为准；费率为固定运作费口径（管理费 + 托管费 + 销售服务费），不含一次性申购/赎回费用。</footer>
     </section>
   </main>;
 }
