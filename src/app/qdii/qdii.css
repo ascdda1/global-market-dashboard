@@ -150,3 +150,20 @@
   .qdii-table td small{font-size:13.5px}
   .perf-up,.perf-down,.perf-flat,.risk-drawdown,.risk-positive,.risk-negative,.risk-neutral{font-size:16.5px}
 }
+
+/* QDII top holdings */
+.holdings-toggle{border:1px solid #4a5663;background:#121820;color:#dce5ee;border-radius:8px;padding:8px 12px;font-size:14px;font-weight:900;cursor:pointer;white-space:nowrap}
+.holdings-toggle:hover,.holdings-toggle.active{border-color:#f59e0b;color:#fbbf24;background:#211b12}
+.holdings-row>td{padding:0!important;background:#10151a!important}
+.holdings-panel{padding:18px 20px 20px;border-top:1px solid #36414c;border-bottom:1px solid #36414c;background:#11171d}
+.holdings-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-end;margin-bottom:14px}
+.holdings-head>div{display:grid;gap:3px}.holdings-head strong{font-size:18px;font-weight:950;color:#f2f4f7}.holdings-head small,.holdings-head span{font-size:12.5px;font-weight:700;color:#93a0ae}
+.holdings-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
+.holding-card{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:9px;align-items:center;padding:11px 12px;border:1px solid #303b46;border-radius:9px;background:#171d24}
+.holding-card:hover{border-color:#495867;background:#1b232c}
+.holding-card>b{display:flex;width:25px;height:25px;align-items:center;justify-content:center;border-radius:7px;background:#222b35;color:#c7d0da;font-size:12px;font-weight:950}
+.holding-card>div{min-width:0;display:grid;gap:2px}.holding-card strong{font-size:14px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.holding-card small{font-size:11.5px!important;margin:0!important;color:#8896a5!important}
+.holding-card em{font-size:15px;font-style:normal;font-weight:950;color:#fbbf24;font-variant-numeric:tabular-nums}
+.holdings-state{padding:20px;border:1px dashed #3b4651;border-radius:8px;text-align:center;color:#96a3b1;font-size:14px;font-weight:750}
+@media(max-width:1200px){.holdings-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.holdings-head{align-items:flex-start;flex-direction:column}.holdings-grid{grid-template-columns:1fr}.holding-card strong{font-size:13.5px}}
