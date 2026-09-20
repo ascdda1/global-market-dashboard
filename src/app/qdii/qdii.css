@@ -6,3 +6,32 @@
 .qdii-view-tabs{display:flex;gap:8px;padding:14px 12px 0}.qdii-view-tabs button{border:1px solid var(--border);background:#11161b;color:#c8d0d9;border-radius:8px;padding:9px 15px;font-weight:800}.qdii-view-tabs button.active{background:var(--accent);border-color:var(--accent);color:#111}.qdii-share-note{margin:10px 12px 0;padding:10px 12px;border:1px solid #3d4650;border-radius:8px;background:#11161b;color:#c5ced8;font-size:12px;line-height:1.6}.qdii-tools select{min-width:132px}
 
 .qdii-risk-note{display:grid;gap:6px;margin:12px;padding:12px 14px;border:1px solid #3a4652;border-radius:8px;background:#11161b;color:#c6d0da;font-size:12px;line-height:1.6}.qdii-risk-note strong{color:#f2f4f7}.qdii-risk-note b{color:#e2e8f0}
+
+/* QDII readability enhancement */
+.qdii-page{font-size:15px}
+.qdii-header h1{font-size:38px;font-weight:850;letter-spacing:-.02em}
+.qdii-header p{font-size:15px;font-weight:650;color:#aeb8c4}
+.qdii-updated b{font-size:13px;font-weight:800}.qdii-updated span{font-size:19px;font-weight:850}.qdii-updated small{font-size:12px;font-weight:700}
+.qdii-summary article{padding:18px 20px}.qdii-summary small,.qdii-summary span{font-size:13px;font-weight:700}.qdii-summary strong{font-size:30px;font-weight:850}
+.qdii-view-tabs button,.qdii-tabs button{font-size:14px;font-weight:850}
+.qdii-share-note{font-size:14px;font-weight:650;line-height:1.7}
+.qdii-tools input,.qdii-tools select{font-size:14px;font-weight:700}
+.qdii-table{font-size:15px}
+.qdii-table th{font-size:14px;font-weight:850;padding:14px 13px;color:#d0d7df}
+.qdii-table td{padding:15px 13px;line-height:1.5}
+.qdii-table td>strong{font-size:16px;font-weight:850;line-height:1.35}
+.qdii-table td>b{font-size:15px;font-weight:850}
+.qdii-table td small{font-size:13px;font-weight:650;color:#aeb8c4}
+.qdii-desc{font-size:14px;font-weight:600;line-height:1.7;color:#e0e5eb}
+.qdii-tag,.venue-badge{font-size:13px;font-weight:850}
+.perf-up,.perf-down,.perf-flat{font-size:16px;font-weight:900}
+.perf-na{font-size:14px;font-weight:750}
+.qdii-note{font-size:12.5px;line-height:1.7;font-weight:600}
+.qdii-risk-note{font-size:13.5px;line-height:1.75}.qdii-risk-note strong{font-size:14px;font-weight:850}.qdii-risk-note b{font-weight:850}
+@media(max-width:800px){
+  .qdii-header h1{font-size:30px}
+  .qdii-table{font-size:14px}
+  .qdii-table th{font-size:13px}
+  .qdii-table td>strong{font-size:15px}
+  .qdii-table td small{font-size:12px}
+}
