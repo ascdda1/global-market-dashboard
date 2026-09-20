@@ -35,3 +35,33 @@
   .qdii-table td>strong{font-size:15px}
   .qdii-table td small{font-size:12px}
 }
+
+/* QDII readability enhancement v2 */
+.qdii-page{font-size:16px}
+.qdii-header h1{font-size:41px;font-weight:900}
+.qdii-header p{font-size:16px;font-weight:700}
+.qdii-summary small,.qdii-summary span{font-size:14px;font-weight:750}
+.qdii-summary strong{font-size:32px;font-weight:900}
+.qdii-view-tabs button,.qdii-tabs button{font-size:15px;font-weight:900}
+.qdii-share-note{font-size:15px;font-weight:700}
+.qdii-tools input,.qdii-tools select{font-size:15px;font-weight:750}
+.qdii-table{font-size:16px}
+.qdii-table th{font-size:15px;font-weight:900;padding:15px 14px}
+.qdii-table td{padding:16px 14px}
+.qdii-table td>strong{font-size:17px;font-weight:900}
+.qdii-table td>b{font-size:16px;font-weight:900}
+.qdii-table td small{font-size:14px;font-weight:700}
+.qdii-desc{font-size:15px;font-weight:650}
+.qdii-tag,.venue-badge{font-size:14px;font-weight:900}
+.perf-up,.perf-down,.perf-flat{font-size:17px;font-weight:900}
+.perf-na{font-size:15px;font-weight:800}
+.qdii-risk-note{font-size:14px;font-weight:650}
+.qdii-risk-note strong{font-size:15px;font-weight:900}
+.qdii-note{font-size:13px;font-weight:650}
+@media(max-width:800px){
+  .qdii-header h1{font-size:32px}
+  .qdii-table{font-size:15px}
+  .qdii-table th{font-size:14px}
+  .qdii-table td>strong{font-size:16px}
+  .qdii-table td small{font-size:13px}
+}
