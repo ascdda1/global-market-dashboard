@@ -87,6 +87,12 @@ function ReturnValue({value}:{value:number|null|undefined}) {
   return <span className={cls}>{value > 0 ? '+' : ''}{value.toFixed(2)}%</span>;
 }
 
+function RiskNumber({ value, kind }: { value:number|null|undefined; kind:'drawdown'|'sharpe' }) {
+  if (value == null) return <span className="perf-na">不适用</span>;
+  const cls = kind === 'drawdown' ? 'risk-drawdown' : value > 0 ? 'risk-positive' : value < 0 ? 'risk-negative' : 'risk-neutral';
+  return <span className={cls}>{kind === 'drawdown' ? `${value.toFixed(2)}%` : value.toFixed(2)}</span>;
+}
+
 function displayTrackingError(f: Fund) {
   if (f.structure === '主动型') return '不适用';
   if (f.trackingError && f.trackingError !== '待更新') return f.trackingError;
@@ -221,9 +227,9 @@ export default function QdiiClient({ embedded = false }: { embedded?: boolean } 
             <td><ReturnValue value={performance[f.code]?.y1.returnPct}/></td>
             <td><ReturnValue value={performance[f.code]?.y3.returnPct}/></td>
             <td><ReturnValue value={performance[f.code]?.y5.returnPct}/></td>
-            <td><strong>{performance[f.code]?.risk3y.maxDrawdownPct == null ? '不适用' : `${performance[f.code]!.risk3y.maxDrawdownPct!.toFixed(2)}%`}</strong><small>峰值至谷底</small></td>
+            <td><RiskNumber value={performance[f.code]?.risk3y.maxDrawdownPct} kind="drawdown"/><small>峰值至谷底</small></td>
             <td><strong>{performance[f.code]?.risk3y.recoveryStatus === 'not_applicable' || performance[f.code]?.risk3y.recoveryDays == null ? '不适用' : `${performance[f.code]!.risk3y.recoveryDays!}天`}</strong><small>{performance[f.code]?.risk3y.recoveryStatus === 'unrecovered' ? '尚未修复·截至最新净值' : performance[f.code]?.risk3y.recoveryStatus === 'recovered' ? '谷底→重回前高' : '历史不足3年'}</small></td>
-            <td><strong>{performance[f.code]?.risk3y.sharpe == null ? '不适用' : performance[f.code]!.risk3y.sharpe!.toFixed(2)}</strong><small>年化·无风险利率按0%</small></td>
+            <td><RiskNumber value={performance[f.code]?.risk3y.sharpe} kind="sharpe"/><small>年化·无风险利率按0%</small></td>
             <td><strong className={f.total<=.70?'low-fee':''}>{f.total.toFixed(2)}%</strong><small>{f.management.toFixed(2)} + {f.custody.toFixed(2)} + {f.service.toFixed(2)}</small></td>
             {view==='场外基金' && <>
               <td><strong>{displayTrackingError(f)}</strong><small>{f.structure === '主动型' ? '主动基金不适用' : (f.trackingError && f.trackingError !== '待更新' ? '真实已录入' : '等待真实数据')}</small></td>
