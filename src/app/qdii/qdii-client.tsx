@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 
 type Fund = {
   name: string;
@@ -80,6 +80,8 @@ type LimitOverride = { fund_code:string; share_class:string; distributor_limit:s
 type PerformancePeriod = { returnPct:number|null; series:{date:string;value:number}[] };
 type RiskStats = { maxDrawdownPct:number|null; recoveryDays:number|null; recoveryStatus:'recovered'|'unrecovered'|'not_applicable'; sharpe:number|null };
 type PerformanceRow = { code:string; latest:string|null; scale:string|null; scaleDate:string|null; ytd:PerformancePeriod; y1:PerformancePeriod; y3:PerformancePeriod; y5:PerformancePeriod; risk3y:RiskStats };
+type HoldingRow = { code:string; name:string; weight:number|null };
+type HoldingsResponse = { code:string; disclosureDate:string|null; holdings:HoldingRow[]; source:string; unavailable?:boolean };
 
 function ReturnValue({value}:{value:number|null|undefined}) {
   if (value == null) return <span className="perf-na">不适用</span>;
@@ -113,6 +115,28 @@ export default function QdiiClient({ embedded = false }: { embedded?: boolean } 
   const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
   const [limitOverrides, setLimitOverrides] = useState<Record<string, LimitOverride>>({});
   const [performance, setPerformance] = useState<Record<string, PerformanceRow>>({});
+  const [expandedHolding, setExpandedHolding] = useState<string|null>(null);
+  const [holdings, setHoldings] = useState<Record<string, HoldingsResponse>>({});
+  const [holdingLoading, setHoldingLoading] = useState<string|null>(null);
+
+  const toggleHoldings = async (code:string) => {
+    if (expandedHolding === code) {
+      setExpandedHolding(null);
+      return;
+    }
+    setExpandedHolding(code);
+    if (holdings[code]) return;
+    setHoldingLoading(code);
+    try {
+      const response = await fetch(`/api/qdii/holdings?code=${encodeURIComponent(code)}`, { cache:'no-store' });
+      const json = await response.json() as HoldingsResponse;
+      setHoldings(current => ({ ...current, [code]: json }));
+    } catch {
+      setHoldings(current => ({ ...current, [code]: { code, disclosureDate:null, holdings:[], source:'Eastmoney / 天天基金公开持仓', unavailable:true } }));
+    } finally {
+      setHoldingLoading(current => current === code ? null : current);
+    }
+  };
   useEffect(() => {
     let active = true;
     void fetch('/api/qdii/limits', { cache: 'no-store' })
@@ -214,8 +238,8 @@ export default function QdiiClient({ embedded = false }: { embedded?: boolean } 
       </div>
       <div className="qdii-table-wrap">
         <table className="qdii-table">
-          <thead><tr><th>基金 / 代码</th><th>交易方式</th><th>管理方式</th><th>份额</th><th>跟踪指数 / 比较基准</th><th>持仓解释</th><th>总规模</th><th>YTD</th><th>1Y</th><th>3Y</th><th>5Y</th><th>近3年最大回撤</th><th>修复时长</th><th>近3年夏普</th><th>固定费率</th>{view==='场外基金' && <><th>跟踪误差</th><th>支付宝/代销</th><th>基金App直销</th></>}</tr></thead>
-          <tbody>{rows.map(f=><tr key={f.code+f.share}>
+          <thead><tr><th>基金 / 代码</th><th>交易方式</th><th>管理方式</th><th>份额</th><th>跟踪指数 / 比较基准</th><th>持仓解释</th><th>总规模</th><th>YTD</th><th>1Y</th><th>3Y</th><th>5Y</th><th>近3年最大回撤</th><th>修复时长</th><th>近3年夏普</th><th>固定费率</th>{view==='场外基金' && <><th>跟踪误差</th><th>支付宝/代销</th><th>基金App直销</th></>}<th>前十大持仓</th></tr></thead>
+          <tbody>{rows.map(f=><Fragment key={f.code+f.share}><tr>
             <td><strong>{f.name}</strong><small>{f.code}</small></td>
             <td><span className={`venue-badge ${f.wrapper==='场内交易'?'on-exchange':'off-exchange'}`}>{f.wrapper}</span></td>
             <td><span className="qdii-tag">{f.structure}</span></td>
@@ -238,7 +262,17 @@ export default function QdiiClient({ embedded = false }: { embedded?: boolean } 
                 <td><strong>{override?.direct_limit ?? f.direct ?? '待更新'}</strong><small>{override?.updated_at ?? f.updated}</small></td>
               </>; })()}
             </>}
-          </tr>)}</tbody>
+            <td><button className={`holdings-toggle${expandedHolding===f.code?' active':''}`} onClick={()=>void toggleHoldings(f.code)}>{expandedHolding===f.code?'收起':'查看持仓'}</button></td>
+          </tr>
+          {expandedHolding===f.code && <tr className="holdings-row"><td colSpan={view==='场外基金' ? 19 : 16}>
+            <div className="holdings-panel">
+              <div className="holdings-head"><div><strong>前十大持仓</strong><small>{holdings[f.code]?.disclosureDate ? `披露日期：${holdings[f.code].disclosureDate}` : '读取最新公开披露'}</small></div><span>{holdings[f.code]?.source ?? 'Eastmoney / 天天基金公开持仓'}</span></div>
+              {holdingLoading===f.code ? <div className="holdings-state">正在读取最新公开持仓…</div> :
+               holdings[f.code]?.holdings?.length ? <div className="holdings-grid">{holdings[f.code].holdings.map((h,index)=><div className="holding-card" key={h.code+h.name+index}><b>{index+1}</b><div><strong>{h.name}</strong><small>{h.code || '—'}</small></div><em>{h.weight == null ? '—' : `${h.weight.toFixed(2)}%`}</em></div>)}</div> :
+               <div className="holdings-state">暂无可用的最新公开前十大持仓数据。</div>}
+            </div>
+          </td></tr>}
+          </Fragment>)}</tbody>
         </table>
       </div>
       <div className="qdii-risk-note"><strong>风险指标说明</strong><span><b>最大回撤：</b>近3年内从某个历史高点跌到随后最低点的最大跌幅，越接近0通常代表下行更温和。</span><span><b>修复时长：</b>从最大回撤谷底开始，到净值重新回到回撤前高点所需的自然日；若仍未回到前高，则显示“尚未修复”并统计至最新净值日。</span><span><b>夏普比率：</b>衡量每承担1单位波动获得多少风险调整后收益；数值越高通常越好。这里统一使用近3年日频净值、252交易日年化，并将无风险利率设为0%以便横向比较。</span></div>
