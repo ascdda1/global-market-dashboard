@@ -373,3 +373,42 @@ footer { display: flex; justify-content: space-between; gap: 15px; margin-top: 2
 @media(max-width:700px){
   .embedded-qdii-section{min-height:100svh;padding-bottom:22vh}
 }
+
+
+/* QDII readability enhancement v2 */
+.qdii-page{font-size:16px}
+.qdii-header h1{font-size:41px;font-weight:900}
+.qdii-header p{font-size:16px;font-weight:700}
+.qdii-summary small,.qdii-summary span{font-size:14px;font-weight:750}
+.qdii-summary strong{font-size:32px;font-weight:900}
+.qdii-view-tabs button,.qdii-tabs button{font-size:15px;font-weight:900}
+.qdii-share-note{font-size:15px;font-weight:700}
+.qdii-tools input,.qdii-tools select{font-size:15px;font-weight:750}
+.qdii-table{font-size:16px}
+.qdii-table th{font-size:15px;font-weight:900;padding:15px 14px}
+.qdii-table td{padding:16px 14px}
+.qdii-table td>strong{font-size:17px;font-weight:900}
+.qdii-table td>b{font-size:16px;font-weight:900}
+.qdii-table td small{font-size:14px;font-weight:700}
+.qdii-desc{font-size:15px;font-weight:650}
+.qdii-tag,.venue-badge{font-size:14px;font-weight:900}
+.perf-up,.perf-down,.perf-flat{font-size:17px;font-weight:900}
+.perf-na{font-size:15px;font-weight:800}
+.qdii-risk-note{font-size:14px;font-weight:650}
+.qdii-risk-note strong{font-size:15px;font-weight:900}
+.qdii-note{font-size:13px;font-weight:650}
+@media(max-width:800px){
+  .qdii-header h1{font-size:32px}
+  .qdii-table{font-size:15px}
+  .qdii-table th{font-size:14px}
+  .qdii-table td>strong{font-size:16px}
+  .qdii-table td small{font-size:13px}
+}
+
+/* Stronger embedded QDII top alignment */
+.embedded-qdii-section{margin-top:0;scroll-margin-top:0;min-height:115vh;padding-bottom:34vh}
+.qdii-embedded .qdii-header{padding-top:0;margin-top:0}
+.qdii-embedded .qdii-header h1{font-size:34px;font-weight:900;margin-top:0}
+@media(max-width:700px){
+  .embedded-qdii-section{min-height:115svh;padding-bottom:28vh}
+}
