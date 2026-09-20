@@ -217,7 +217,7 @@ export default function QdiiClient({ embedded = false }: { embedded?: boolean } 
             <td><ReturnValue value={performance[f.code]?.y5.returnPct}/></td>
             <td><strong>{performance[f.code]?.risk3y.maxDrawdownPct == null ? '不适用' : `${performance[f.code].risk3y.maxDrawdownPct.toFixed(2)}%`}</strong><small>峰值至谷底</small></td>
             <td><strong>{performance[f.code]?.risk3y.recoveryStatus === 'not_applicable' || performance[f.code]?.risk3y.recoveryDays == null ? '不适用' : `${performance[f.code].risk3y.recoveryDays}天`}</strong><small>{performance[f.code]?.risk3y.recoveryStatus === 'unrecovered' ? '尚未修复·截至最新净值' : performance[f.code]?.risk3y.recoveryStatus === 'recovered' ? '谷底→重回前高' : '历史不足3年'}</small></td>
-            <td><strong>{performance[f.code]?.risk3y.sharpe == null ? '不适用' : performance[f.code].risk3y.sharpe.toFixed(2)}</strong><small>年化·无风险利率按0%</small></td>
+            <td><strong>{performance[f.code]?.risk3y.sharpe == null ? '不适用' : performance[f.code]!.risk3y.sharpe!.toFixed(2)}</strong><small>年化·无风险利率按0%</small></td>
             <td><strong className={f.total<=.70?'low-fee':''}>{f.total.toFixed(2)}%</strong><small>{f.management.toFixed(2)} + {f.custody.toFixed(2)} + {f.service.toFixed(2)}</small></td>
             <td><strong>{displayTrackingError(f)}</strong><small>{f.structure === '主动型' ? '主动基金不适用' : (f.trackingError && f.trackingError !== '待更新' ? '真实已录入' : '等待真实数据')}</small></td>
             {(() => { const override = limitOverrides[`${f.code}::${f.share}`]; return <>
