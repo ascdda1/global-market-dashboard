@@ -184,7 +184,7 @@ export default function QdiiClient({ embedded = false }: { embedded?: boolean } 
     <section className="qdii-panel">
       <div className="qdii-view-tabs">
         <button className={view==='场外基金'?'active':''} onClick={()=>{setView('场外基金');keepQdiiAtTop();}}>场外基金</button>
-        <button className={view==='场内ETF'?'active':''} onClick={()=>{setView('场内ETF');keepQdiiAtTop();}}>场内 ETF / LOF</button>
+        <button className={view==='场内ETF'?'active':''} onClick={()=>{setView('场内ETF');if(sortKey==='tracking')setSortKey('fee');keepQdiiAtTop();}}>场内 ETF / LOF</button>
       </div>
       {view==='场外基金' && <div className="qdii-share-note">长期持有通常优先关注 A 类等低持续费率份额；为减少同一指数产品的重复展示，本页指数型基金默认隐藏 C 类，仅保留 A / E / I 等更适合长期比较的份额。</div>}
       <div className="qdii-tabs">{cats.map(c=><button key={c} className={category===c?'active':''} onClick={()=>{setCategory(c);keepQdiiAtTop();}}>{c}</button>)}</div>
@@ -197,7 +197,7 @@ export default function QdiiClient({ embedded = false }: { embedded?: boolean } 
           <option value="y3">按 3Y</option>
           <option value="y5">按 5Y</option>
           <option value="scale">按总规模</option>
-          <option value="tracking">按跟踪误差</option>
+          {view==='场外基金' && <option value="tracking">按跟踪误差</option>}
           <option value="drawdown">按最大回撤</option>
           <option value="sharpe">按夏普比率</option>
         </select>
@@ -208,7 +208,7 @@ export default function QdiiClient({ embedded = false }: { embedded?: boolean } 
       </div>
       <div className="qdii-table-wrap">
         <table className="qdii-table">
-          <thead><tr><th>基金 / 代码</th><th>交易方式</th><th>管理方式</th><th>份额</th><th>跟踪指数 / 比较基准</th><th>持仓解释</th><th>总规模</th><th>YTD</th><th>1Y</th><th>3Y</th><th>5Y</th><th>近3年最大回撤</th><th>修复时长</th><th>近3年夏普</th><th>固定费率</th><th>跟踪误差</th><th>支付宝/代销</th><th>基金App直销</th></tr></thead>
+          <thead><tr><th>基金 / 代码</th><th>交易方式</th><th>管理方式</th><th>份额</th><th>跟踪指数 / 比较基准</th><th>持仓解释</th><th>总规模</th><th>YTD</th><th>1Y</th><th>3Y</th><th>5Y</th><th>近3年最大回撤</th><th>修复时长</th><th>近3年夏普</th><th>固定费率</th>{view==='场外基金' && <><th>跟踪误差</th><th>支付宝/代销</th><th>基金App直销</th></>}</tr></thead>
           <tbody>{rows.map(f=><tr key={f.code+f.share}>
             <td><strong>{f.name}</strong><small>{f.code}</small></td>
             <td><span className={`venue-badge ${f.wrapper==='场内交易'?'on-exchange':'off-exchange'}`}>{f.wrapper}</span></td>
@@ -225,11 +225,13 @@ export default function QdiiClient({ embedded = false }: { embedded?: boolean } 
             <td><strong>{performance[f.code]?.risk3y.recoveryStatus === 'not_applicable' || performance[f.code]?.risk3y.recoveryDays == null ? '不适用' : `${performance[f.code]!.risk3y.recoveryDays!}天`}</strong><small>{performance[f.code]?.risk3y.recoveryStatus === 'unrecovered' ? '尚未修复·截至最新净值' : performance[f.code]?.risk3y.recoveryStatus === 'recovered' ? '谷底→重回前高' : '历史不足3年'}</small></td>
             <td><strong>{performance[f.code]?.risk3y.sharpe == null ? '不适用' : performance[f.code]!.risk3y.sharpe!.toFixed(2)}</strong><small>年化·无风险利率按0%</small></td>
             <td><strong className={f.total<=.70?'low-fee':''}>{f.total.toFixed(2)}%</strong><small>{f.management.toFixed(2)} + {f.custody.toFixed(2)} + {f.service.toFixed(2)}</small></td>
-            <td><strong>{displayTrackingError(f)}</strong><small>{f.structure === '主动型' ? '主动基金不适用' : (f.trackingError && f.trackingError !== '待更新' ? '真实已录入' : '等待真实数据')}</small></td>
-            {(() => { const override = limitOverrides[`${f.code}::${f.share}`]; return <>
-            <td><strong>{override?.distributor_limit ?? f.alipay ?? '待更新'}</strong><small>{override?.updated_at ?? f.updated}</small></td>
-            <td><strong>{override?.direct_limit ?? f.direct ?? '待更新'}</strong><small>{override?.updated_at ?? f.updated}</small></td>
-          </>; })()}
+            {view==='场外基金' && <>
+              <td><strong>{displayTrackingError(f)}</strong><small>{f.structure === '主动型' ? '主动基金不适用' : (f.trackingError && f.trackingError !== '待更新' ? '真实已录入' : '等待真实数据')}</small></td>
+              {(() => { const override = limitOverrides[`${f.code}::${f.share}`]; return <>
+                <td><strong>{override?.distributor_limit ?? f.alipay ?? '待更新'}</strong><small>{override?.updated_at ?? f.updated}</small></td>
+                <td><strong>{override?.direct_limit ?? f.direct ?? '待更新'}</strong><small>{override?.updated_at ?? f.updated}</small></td>
+              </>; })()}
+            </>}
           </tr>)}</tbody>
         </table>
       </div>
