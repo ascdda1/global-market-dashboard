@@ -65,3 +65,88 @@
   .qdii-table td>strong{font-size:16px}
   .qdii-table td small{font-size:13px}
 }
+
+/* QDII visual polish v3 */
+.qdii-page{font-size:17px}
+.qdii-header{padding:2px 2px 0;margin-bottom:18px}
+.qdii-header h1{font-size:44px;font-weight:950;letter-spacing:-.025em;text-shadow:0 1px 0 rgba(255,255,255,.03)}
+.qdii-header p{font-size:17px;font-weight:750;color:#b7c1cc}
+.qdii-summary{gap:14px}
+.qdii-summary article{
+  padding:20px 22px;
+  border-color:#34404c;
+  background:linear-gradient(180deg,#1a2027 0%,#161b21 100%);
+  box-shadow:0 8px 24px rgba(0,0,0,.14);
+}
+.qdii-summary article:hover{border-color:#4a5866;transform:translateY(-1px)}
+.qdii-summary strong{font-size:34px;font-weight:950;letter-spacing:-.02em}
+.qdii-summary small,.qdii-summary span{font-size:14.5px;font-weight:800}
+.qdii-panel{border-color:#34404c;box-shadow:0 12px 34px rgba(0,0,0,.18)}
+.qdii-view-tabs{padding:16px 14px 4px;gap:10px}
+.qdii-view-tabs button,.qdii-tabs button{
+  font-size:16px;
+  font-weight:900;
+  border-color:#3a4652;
+  transition:background .15s ease,border-color .15s ease,transform .15s ease;
+}
+.qdii-view-tabs button:hover,.qdii-tabs button:hover{border-color:#647180;transform:translateY(-1px)}
+.qdii-tabs{padding:14px;gap:9px}
+.qdii-share-note{font-size:15.5px;font-weight:750;border-color:#46515d;background:#121820}
+.qdii-tools{padding:14px}
+.qdii-tools input,.qdii-tools select{height:42px;font-size:15.5px;font-weight:800;border-color:#3a4652;background:#10151b}
+.qdii-table{font-size:17px}
+.qdii-table th{
+  font-size:16px;
+  font-weight:950;
+  padding:16px 15px;
+  color:#e5ebf2;
+  background:#12171d;
+  border-bottom:1px solid #45515d;
+  letter-spacing:.015em;
+}
+.qdii-table td{
+  padding:18px 15px;
+  border-bottom:1px solid #28323c;
+  background:#171c22;
+}
+.qdii-table tbody tr:nth-child(even) td{background:#151a20}
+.qdii-table tbody tr:hover td{background:#202833}
+.qdii-table td>strong{font-size:18px;font-weight:950;line-height:1.35}
+.qdii-table td>b{font-size:17px;font-weight:950}
+.qdii-table td small{font-size:14.5px;font-weight:750;color:#aeb9c5}
+.qdii-desc{font-size:15.5px;font-weight:700;line-height:1.72;color:#e2e7ed}
+.qdii-tag,.venue-badge{font-size:14.5px;font-weight:950}
+.perf-up,.perf-down,.perf-flat,.risk-drawdown,.risk-positive,.risk-negative,.risk-neutral{
+  display:inline-block;
+  min-width:74px;
+  font-size:18px;
+  font-weight:950;
+  line-height:1.2;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:-.01em;
+}
+.perf-up,.risk-positive{color:#4ade80}
+.perf-down,.risk-negative,.risk-drawdown{color:#fb7185}
+.perf-flat,.risk-neutral{color:#e5e7eb}
+.perf-up{background:rgba(34,197,94,.08);padding:5px 7px;border-radius:6px}
+.perf-down{background:rgba(244,63,94,.09);padding:5px 7px;border-radius:6px}
+.perf-flat{background:rgba(148,163,184,.08);padding:5px 7px;border-radius:6px}
+.risk-drawdown{background:rgba(244,63,94,.10);padding:5px 7px;border-radius:6px}
+.risk-positive{background:rgba(34,197,94,.08);padding:5px 7px;border-radius:6px}
+.risk-negative{background:rgba(244,63,94,.09);padding:5px 7px;border-radius:6px}
+.risk-neutral{background:rgba(148,163,184,.08);padding:5px 7px;border-radius:6px}
+.perf-na{font-size:15.5px;font-weight:850;color:#8f9aa7}
+.low-fee{color:#4ade80!important}
+.qdii-risk-note{font-size:14.5px;font-weight:700;border-color:#46515d;background:#121820}
+.qdii-risk-note strong{font-size:16px;font-weight:950}
+.qdii-note{font-size:13.5px;font-weight:700;color:#98a4b2}
+@media(max-width:800px){
+  .qdii-page{font-size:16px}
+  .qdii-header h1{font-size:34px}
+  .qdii-header p{font-size:15px}
+  .qdii-table{font-size:15.5px}
+  .qdii-table th{font-size:14.5px}
+  .qdii-table td>strong{font-size:16.5px}
+  .qdii-table td small{font-size:13.5px}
+  .perf-up,.perf-down,.perf-flat,.risk-drawdown,.risk-positive,.risk-negative,.risk-neutral{font-size:16.5px}
+}
