@@ -94,6 +94,12 @@ function displayTrackingError(f: Fund) {
 }
 
 export default function QdiiClient({ embedded = false }: { embedded?: boolean } = {}) {
+  const keepQdiiAtTop = () => {
+    if (!embedded) return;
+    requestAnimationFrame(() => {
+      document.getElementById('qdii')?.scrollIntoView({ block: 'start', behavior: 'auto' });
+    });
+  };
   const [category, setCategory] = useState('全部');
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'场外基金'|'场内ETF'>('场外基金');
@@ -177,11 +183,11 @@ export default function QdiiClient({ embedded = false }: { embedded?: boolean } 
 
     <section className="qdii-panel">
       <div className="qdii-view-tabs">
-        <button className={view==='场外基金'?'active':''} onClick={()=>setView('场外基金')}>场外基金</button>
-        <button className={view==='场内ETF'?'active':''} onClick={()=>setView('场内ETF')}>场内 ETF / LOF</button>
+        <button className={view==='场外基金'?'active':''} onClick={()=>{setView('场外基金');keepQdiiAtTop();}}>场外基金</button>
+        <button className={view==='场内ETF'?'active':''} onClick={()=>{setView('场内ETF');keepQdiiAtTop();}}>场内 ETF / LOF</button>
       </div>
       {view==='场外基金' && <div className="qdii-share-note">长期持有通常优先关注 A 类等低持续费率份额；为减少同一指数产品的重复展示，本页指数型基金默认隐藏 C 类，仅保留 A / E / I 等更适合长期比较的份额。</div>}
-      <div className="qdii-tabs">{cats.map(c=><button key={c} className={category===c?'active':''} onClick={()=>setCategory(c)}>{c}</button>)}</div>
+      <div className="qdii-tabs">{cats.map(c=><button key={c} className={category===c?'active':''} onClick={()=>{setCategory(c);keepQdiiAtTop();}}>{c}</button>)}</div>
       <div className="qdii-tools">
         <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索基金名称 / 代码 / 指数" />
         <select value={sortKey} onChange={e=>setSortKey(e.target.value as typeof sortKey)}>
